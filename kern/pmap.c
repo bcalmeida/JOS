@@ -152,12 +152,15 @@ mem_init(void)
 	// to initialize all fields of each struct PageInfo to 0.
 	// Your code goes here:
 
-	pages = (struct PageInfo *) boot_alloc(npages * 8);
-	memset(pages, 0, npages * 8);
+	pages = (struct PageInfo *) boot_alloc(npages * sizeof(struct Env));
+	memset(pages, 0, npages * sizeof(struct Env));
 
 	//////////////////////////////////////////////////////////////////////
 	// Make 'envs' point to an array of size 'NENV' of 'struct Env'.
 	// LAB 3: Your code here.
+
+	envs = (struct Env *) boot_alloc(NENV * sizeof(struct Env));
+	memset(envs, 0, NENV * sizeof(struct Env));
 
 	//////////////////////////////////////////////////////////////////////
 	// Now that we've allocated the initial kernel data structures, we set
@@ -193,6 +196,9 @@ mem_init(void)
 	//    - envs itself -- kernel RW, user NONE
 	// LAB 3: Your code here.
 
+	size = ROUNDUP(NENV * sizeof(struct Env), PGSIZE);
+	boot_map_region(kern_pgdir, UENVS, size, PADDR(envs), PTE_U);
+
 	//////////////////////////////////////////////////////////////////////
 	// Use the physical memory that 'bootstack' refers to as the kernel
 	// stack.  The kernel stack grows down from virtual address KSTACKTOP.
@@ -204,7 +210,6 @@ mem_init(void)
 	//       overwrite memory.  Known as a "guard page".
 	//     Permissions: kernel RW, user NONE
 	// Your code goes here:
-
 	extern char bootstack[];
 	boot_map_region(kern_pgdir, KSTACKTOP-KSTKSIZE, KSTKSIZE, PADDR(bootstack), PTE_W);
 
@@ -216,7 +221,8 @@ mem_init(void)
 	// we just set up the mapping anyway.
 	// Permissions: kernel RW, user NONE
 	// Your code goes here:
-	boot_map_region(kern_pgdir, KERNBASE, ((0xFFFFFFFF) - KERNBASE) + 1, 0, PTE_W);
+	size = ((0xFFFFFFFF) - KERNBASE) + 1;
+	boot_map_region(kern_pgdir, KERNBASE, size, 0, PTE_W);
 
 	// Check that the initial page directory has been set up correctly.
 	check_kern_pgdir();
@@ -444,6 +450,8 @@ boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm
 	uint32_t i;
 	for (i = 0; i < n; i++) {
 		pte_t *pte = pgdir_walk(pgdir, (void *) va, 1);
+		if (!pte)
+			panic("boot_map_region: could not allocate page table");
 		uint32_t pa_without_offset = (pa & 0xFFFFF000);
 		*pte = (pa_without_offset | perm | PTE_P);
 		va += PGSIZE;
