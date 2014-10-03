@@ -116,7 +116,22 @@ env_init(void)
 {
 	// Set up envs array
 	// LAB 3: Your code here.
+	uint32_t i;
+	for (i = NENV-1; i >= 0; i++) {
+		//TODO: Is it needed to initialize the other fields?
+		//envs[i].env_tf = NULL;
+		envs[i].env_id = 0;
+		//envs[i].env_parent_id = 0;
+		//envs[i].env_type = 0;
+		//envs[i].env_status = 0;
+		//envs[i].env_runs = 0;
 
+		envs[i].env_link = env_free_list;
+		env_free_list = &envs[i];
+		
+		envs[i].env_pgdir = NULL;
+
+	}
 	// Per-CPU part of the initialization
 	env_init_percpu();
 }
@@ -180,6 +195,29 @@ env_setup_vm(struct Env *e)
 
 	// LAB 3: Your code here.
 
+	// ** Start of my code ** //
+	p->pp_ref += 1; // TODO: Why?
+	e->env_pgdir = page2kva(p);
+	//* Needs to map everything above UTOP: pages, envs, kernel stack 
+	//* and all physical memory
+	
+	// Allocates read-only pages at [UPAGES, UPAGES+PTSIZE)
+	uint32_t size = ROUNDUP(npages * sizeof(struct PageInfo), PGSIZE);
+	boot_map_region(e->env_pgdir, UPAGES, size, PADDR(pages), PTE_U);
+
+	// Allocates read-only envs at [UENVS, UENVS+PTSIZE)
+	size = ROUNDUP(NENV * sizeof(struct Env), PGSIZE);
+	boot_map_region(e->env_pgdir, UENVS, size, PADDR(envs), PTE_U);
+
+	// Allocates the kernel stack		
+	extern char bootstack[];
+	boot_map_region(kern_pgdir, KSTACKTOP-KSTKSIZE, KSTKSIZE, PADDR(bootstack), PTE_W);
+
+	// Allocates all physical memory at [KERNBASE, 2^32)
+	size = ((0xFFFFFFFF) - KERNBASE) + 1; // Be careful with overflow
+	boot_map_region(e->env_pgdir, KERNBASE, size, 0, PTE_W);
+	// ** End of my code ** //
+	
 	// UVPT maps the env's own page table read-only.
 	// Permissions: kernel R, user R
 	e->env_pgdir[PDX(UVPT)] = PADDR(e->env_pgdir) | PTE_P | PTE_U;
@@ -267,6 +305,18 @@ region_alloc(struct Env *e, void *va, size_t len)
 	//   'va' and 'len' values that are not page-aligned.
 	//   You should round va down, and round (va + len) up.
 	//   (Watch out for corner-cases!)
+
+	uintptr_t va_start = ROUNDDOWN((uintptr_t) va, PGSIZE);
+	uintptr_t va_end = ROUNDUP(((uintptr_t) va) + len, PGSIZE);
+
+	uint32_t n = (va_end - va_start)/PGSIZE;
+	uint32_t i;
+	uint32_t va_current = va_start;
+	for (i = 0; i < n; i++) {
+		struct PageInfo *pp = page_alloc(0);
+		page_insert(e->env_pgdir, pp, (void *) va_current, PTE_U | PTE_W);
+		va_current += PGSIZE;
+	}
 }
 
 //
