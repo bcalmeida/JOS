@@ -118,20 +118,12 @@ env_init(void)
 	// LAB 3: Your code here.
 	int i;
 	for (i = NENV-1; i >= 0; i--) {
-		//TODO: Is it needed to initialize the other fields?
-		//envs[i].env_tf = NULL;
-		//envs[i].env_parent_id = 0;
-		//envs[i].env_type = 0;
-		//envs[i].env_status = 0;
-		//envs[i].env_runs = 0;
-
 		envs[i].env_id = 0;
 
 		envs[i].env_link = env_free_list;
 		env_free_list = &envs[i];
-		
-		envs[i].env_pgdir = NULL;
 
+		envs[i].env_pgdir = NULL;
 	}
 	// Per-CPU part of the initialization
 	env_init_percpu();
@@ -195,13 +187,19 @@ env_setup_vm(struct Env *e)
 	//    - The functions in kern/pmap.h are handy.
 
 	// LAB 3: Your code here.
-
-	// ** Start of my code ** //
 	p->pp_ref += 1; // TODO: Why?
 	e->env_pgdir = page2kva(p);
-	//* Needs to map everything above UTOP: pages, envs, kernel stack 
-	//* and all physical memory
-	
+
+	// Needs to map everything above UTOP: pages, envs, kernel stack
+	// and all physical memory
+
+	// More elegant way
+	for (i = PDX(UTOP); i < NPDENTRIES; i++) {
+		e->env_pgdir[i] = kern_pgdir[i];
+	}
+
+	// Less elegant way
+	/*
 	// Allocates read-only pages at [UPAGES, UPAGES+PTSIZE)
 	uint32_t size = ROUNDUP(npages * sizeof(struct PageInfo), PGSIZE);
 	boot_map_region(e->env_pgdir, UPAGES, size, PADDR(pages), PTE_U);
@@ -210,15 +208,15 @@ env_setup_vm(struct Env *e)
 	size = ROUNDUP(NENV * sizeof(struct Env), PGSIZE);
 	boot_map_region(e->env_pgdir, UENVS, size, PADDR(envs), PTE_U);
 
-	// Allocates the kernel stack		
+	// Allocates the kernel stack
 	extern char bootstack[];
-	boot_map_region(kern_pgdir, KSTACKTOP-KSTKSIZE, KSTKSIZE, PADDR(bootstack), PTE_W);
+	boot_map_region(e->env_pgdir, KSTACKTOP-KSTKSIZE, KSTKSIZE, PADDR(bootstack), PTE_W);
 
 	// Allocates all physical memory at [KERNBASE, 2^32)
 	size = ((0xFFFFFFFF) - KERNBASE) + 1; // Be careful with overflow
 	boot_map_region(e->env_pgdir, KERNBASE, size, 0, PTE_W);
-	// ** End of my code ** //
-	
+	*/
+
 	// UVPT maps the env's own page table read-only.
 	// Permissions: kernel R, user R
 	e->env_pgdir[PDX(UVPT)] = PADDR(e->env_pgdir) | PTE_P | PTE_U;
