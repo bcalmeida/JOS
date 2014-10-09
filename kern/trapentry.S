@@ -47,9 +47,44 @@
  * Lab 3: Your code here for generating entry points for the different traps.
  */
 
-
+TRAPHANDLER_NOEC(handler0, 0)
+TRAPHANDLER_NOEC(handler1, 1)
+TRAPHANDLER_NOEC(handler2, 2)
+TRAPHANDLER_NOEC(handler3, 3)
+TRAPHANDLER_NOEC(handler4, 4)
+TRAPHANDLER_NOEC(handler5, 5)
+TRAPHANDLER_NOEC(handler6, 6)
+TRAPHANDLER_NOEC(handler7, 7)
+TRAPHANDLER(handler8, 8)
+TRAPHANDLER_NOEC(handler9, 9)
+TRAPHANDLER(handler10, 10)
+TRAPHANDLER(handler11, 11)
+TRAPHANDLER(handler12, 12)
+TRAPHANDLER(handler13, 13)
+TRAPHANDLER(handler14, 14)
+TRAPHANDLER_NOEC(handler15, 15)
+TRAPHANDLER_NOEC(handler16, 16)
+TRAPHANDLER(handler17, 17)
+TRAPHANDLER_NOEC(handler18, 18)
+TRAPHANDLER_NOEC(handler19, 19)
 
 /*
  * Lab 3: Your code here for _alltraps
  */
+// TODO: CHANGE ASSEMBLY TYPE?
+.globl _alltraps
+_alltraps:
+	# Push values to make the stack look like a struct Trapframe
+	pushl %ds
+	pushl %es
+	pushal
 
+	# Load GD_KD into %ds and %es
+	mov $GD_KD, %eax
+	mov %ax, %ds
+	mov %ax, %es
+
+	# Call trap(tf), where tf=%esp
+	pushl %esp
+	call trap
+	addl $4, %esp
