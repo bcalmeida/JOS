@@ -104,7 +104,7 @@ boot_alloc(uint32_t n)
 	if (n > 0) {
 		if ((uint32_t) PADDR(ROUNDUP(nextfree+n, PGSIZE)) > npages*PGSIZE)
 			panic("boot_alloc: out of memory");
-		nextfree = ROUNDUP(nextfree + n, PGSIZE);	
+		nextfree = ROUNDUP(nextfree + n, PGSIZE);
 	}
 	return result;
 }
@@ -184,7 +184,7 @@ mem_init(void)
 	//      (ie. perm = PTE_U | PTE_P)
 	//    - pages itself -- kernel RW, user NONE
 	// Your code goes here:
-	
+
 	uint32_t size = ROUNDUP(npages * sizeof(struct PageInfo), PGSIZE);
 	boot_map_region(kern_pgdir, UPAGES, size, PADDR(pages), PTE_U);
 
@@ -298,10 +298,10 @@ page_init(void)
 		pages[i].pp_link = page_free_list;
 		page_free_list = &pages[i];
 	}
-	
+
 	char *first_free_page = (char *) boot_alloc(0);
 	size_t first_free_page_number = PGNUM(PADDR(first_free_page));
-	
+
 	for (i = npages_basemem; i < first_free_page_number; i++) {
 		pages[i].pp_ref = 0;
 		pages[i].pp_link = NULL;
@@ -310,7 +310,7 @@ page_init(void)
 	for (i = first_free_page_number; i < npages; i++) {
 		pages[i].pp_ref = 0;
 		pages[i].pp_link = page_free_list;
-		page_free_list = &pages[i]; 
+		page_free_list = &pages[i];
 	}
 }
 
@@ -407,7 +407,7 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
 	// If pgdir_entry is present
 	if (*pgdir_entry & PTE_P) {
 		physaddr_t pgtable_pa = (physaddr_t) (*pgdir_entry & 0xFFFFF000);
-		pte_t *pgtable = (pte_t *) KADDR(pgtable_pa); 
+		pte_t *pgtable = (pte_t *) KADDR(pgtable_pa);
 		return pgtable + pgtable_index;
 	// If it is not present
 	} else if (create) {
@@ -423,7 +423,7 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
 			*pgdir_entry = (pgtable_pa | PTE_P | PTE_W | PTE_U);
 			// Return the virtual addres of the PTE
 			return pgtable + pgtable_index;
-		} 
+		}
 	}
 	return NULL;
 }
@@ -444,7 +444,7 @@ boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm
 {
 	// Fill this function in
 	// TODO: Add panic for va an pa aligned
-	if (size % PGSIZE != 0) 
+	if (size % PGSIZE != 0)
 		panic("boot_map_region: size is not multiple of PGSIZE");
 	uint32_t n = size/PGSIZE;
 	uint32_t i;
@@ -456,7 +456,7 @@ boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm
 		*pte = (pa_without_offset | perm | PTE_P);
 		va += PGSIZE;
 		pa += PGSIZE;
-	} 
+	}
 }
 
 //
