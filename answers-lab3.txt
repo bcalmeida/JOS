@@ -1,0 +1,4 @@
+ANSWERS-LAB3
+1. If all interrupts were delivered to the same handler, we wouldn't be able to differentiate the case where the interrupts pushes an error code to the stack, and the case where it doesn't.
+
+2. When the user program tries to call int 14, as it doesn't have the permission to do it, the processor calls int 13, which is the general protection fault. As the manual says: "Interrupt or exception via trap or interrupt gate from V86 mode to privilege level other than zero.".
