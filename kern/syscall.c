@@ -70,11 +70,31 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 	// Return any appropriate return value.
 	// LAB 3: Your code here.
 
-	panic("syscall not implemented");
+	// panic("syscall not implemented");
 
+	int32_t ret = 0;
+
+	// TODO: Remove debugging printings
 	switch (syscallno) {
+	case SYS_cputs:
+		cprintf("DEBUGGING: Calling sys_cputs!\n");
+		sys_cputs((char *) a1, (size_t) a2);
+		break;
+	case SYS_cgetc:
+		cprintf("DEBUGGING: Calling sys_cgetc!\n");
+		ret = sys_cgetc();
+		break;
+	case SYS_getenvid:
+		cprintf("DEBUGGING: Calling sys_getenvid!\n");
+		ret = (int32_t) sys_getenvid();
+		break;
+	case SYS_env_destroy:
+		cprintf("DEBUGGING: Calling sys_env_destroy!\n");
+		ret = sys_env_destroy((envid_t) a1);
+		break;
 	default:
 		return -E_NO_SYS;
 	}
+	return ret;
 }
 

@@ -78,12 +78,14 @@ extern void* handler16;
 extern void* handler17;
 extern void* handler18;
 extern void* handler19;
+extern void* handler_syscall;
 void
 trap_init(void)
 {
 	extern struct Segdesc gdt[];
 
 	// LAB 3: Your code here.
+	// TODO: Start using T_* instead of interrupt numbers
 	SETGATE(idt[0], 0, GD_KT, &handler0, 0);
 	SETGATE(idt[1], 0, GD_KT, &handler1, 0);
 	SETGATE(idt[2], 0, GD_KT, &handler2, 0);
@@ -104,6 +106,8 @@ trap_init(void)
 	SETGATE(idt[17], 0, GD_KT, &handler17, 0);
 	SETGATE(idt[18], 0, GD_KT, &handler18, 0);
 	SETGATE(idt[19], 0, GD_KT, &handler19, 0);
+	// For system call
+	SETGATE(idt[T_SYSCALL], 0, GD_KT, &handler_syscall, 3);
 
 	// Per-CPU setup 
 	trap_init_percpu();
@@ -182,10 +186,32 @@ trap_dispatch(struct Trapframe *tf)
 {
 	// Handle processor exceptions.
 	// LAB 3: Your code here.
-	if (tf->tf_trapno == 3)
+	// TODO: Start using T_* instead of interrupt numbers
+	// TODO: Use a switch
+	// TODO: Remove debugging printings
+	if (tf->tf_trapno == 3) {
+		cprintf("DEBUGGING: Trap dispatch - Breakpoint\n");
 		monitor(tf);
-	if (tf->tf_trapno == 14)
+		return;
+	}
+	if (tf->tf_trapno == 14) {
+		cprintf("DEBUGGING: Page fault\n");
 		page_fault_handler(tf);
+		return;
+	}
+	if (tf->tf_trapno == T_SYSCALL) {
+		cprintf("DEBUGGING: system call\n");
+		struct PushRegs regs = tf->tf_regs;
+		int32_t retValue;
+		retValue = syscall(regs.reg_eax,// system call number - eax
+				regs.reg_edx,	// a1 - edx
+				regs.reg_ecx,	// a2 - ecx
+				regs.reg_ebx,	// a3 - ebx
+				regs.reg_edi,	// a4 - edi
+				regs.reg_esi);	// a5 - esi
+		tf->tf_regs.reg_eax = retValue;
+		return;
+	}
 
 	// Unexpected trap: The user process or the kernel has a bug.
 	print_trapframe(tf);

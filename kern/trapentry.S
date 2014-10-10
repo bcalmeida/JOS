@@ -67,11 +67,13 @@ TRAPHANDLER_NOEC(handler16, 16)
 TRAPHANDLER(handler17, 17)
 TRAPHANDLER_NOEC(handler18, 18)
 TRAPHANDLER_NOEC(handler19, 19)
+# For system call
+TRAPHANDLER_NOEC(handler_syscall, T_SYSCALL)
 
 /*
  * Lab 3: Your code here for _alltraps
  */
-// TODO: CHANGE ASSEMBLY TYPE?
+// TODO: Replace mov with movw
 .globl _alltraps
 _alltraps:
 	# Push values to make the stack look like a struct Trapframe
