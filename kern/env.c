@@ -531,9 +531,9 @@ env_run(struct Env *e)
 	// LAB 3: Your code here.
 	// Step 1
 	if (curenv)
-		curenv->env_type = ENV_RUNNABLE;
+		curenv->env_status = ENV_RUNNABLE;
 	curenv = e;
-	e->env_type = ENV_RUNNING;
+	e->env_status = ENV_RUNNING;
 	e->env_runs += 1;
 	lcr3(PADDR(e->env_pgdir));
 
