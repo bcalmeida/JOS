@@ -90,3 +90,28 @@ _alltraps:
 	pushl %esp
 	call trap
 	addl $4, %esp
+
+# Used for Lab 3 - Challenge. It is used to make a loop in C code.
+.data
+.globl handlers
+handlers:
+	.long handler0
+	.long handler1
+	.long handler2
+	.long handler3
+	.long handler4
+	.long handler5
+	.long handler6
+	.long handler7
+	.long handler8
+	.long handler9
+	.long handler10
+	.long handler11
+	.long handler12
+	.long handler13
+	.long handler14
+	.long handler15
+	.long handler16
+	.long handler17
+	.long handler18
+	.long handler19
