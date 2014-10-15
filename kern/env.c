@@ -192,30 +192,10 @@ env_setup_vm(struct Env *e)
 
 	// Needs to map everything above UTOP: pages, envs, kernel stack
 	// and all physical memory
-
-	// More elegant way
+	// More elegant way: just copy. Less elegant: map with boot_map_region...
 	for (i = PDX(UTOP); i < NPDENTRIES; i++) {
 		e->env_pgdir[i] = kern_pgdir[i];
 	}
-
-	// Less elegant way
-	/*
-	// Allocates read-only pages at [UPAGES, UPAGES+PTSIZE)
-	uint32_t size = ROUNDUP(npages * sizeof(struct PageInfo), PGSIZE);
-	boot_map_region(e->env_pgdir, UPAGES, size, PADDR(pages), PTE_U);
-
-	// Allocates read-only envs at [UENVS, UENVS+PTSIZE)
-	size = ROUNDUP(NENV * sizeof(struct Env), PGSIZE);
-	boot_map_region(e->env_pgdir, UENVS, size, PADDR(envs), PTE_U);
-
-	// Allocates the kernel stack
-	extern char bootstack[];
-	boot_map_region(e->env_pgdir, KSTACKTOP-KSTKSIZE, KSTKSIZE, PADDR(bootstack), PTE_W);
-
-	// Allocates all physical memory at [KERNBASE, 2^32)
-	size = ((0xFFFFFFFF) - KERNBASE) + 1; // Be careful with overflow
-	boot_map_region(e->env_pgdir, KERNBASE, size, 0, PTE_W);
-	*/
 
 	// UVPT maps the env's own page table read-only.
 	// Permissions: kernel R, user R
