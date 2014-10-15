@@ -65,13 +65,23 @@ static const char *trapname(int trapno)
 	return "(unknown trap)";
 }
 
-
+extern void* handler_syscall;
+extern uint32_t handlers[];
 void
 trap_init(void)
 {
 	extern struct Segdesc gdt[];
 
 	// LAB 3: Your code here.
+	// Processor internal interrupts
+	int i;
+	for (i = 0; i <= 19; i++) {
+		SETGATE(idt[i], 0, GD_KT, handlers[i], 0);
+	}
+	SETGATE(idt[T_BRKPT], 0, GD_KT, handlers[T_BRKPT], 3);
+
+	// For system call
+	SETGATE(idt[T_SYSCALL], 0, GD_KT, &handler_syscall, 3);
 
 	// Per-CPU setup 
 	trap_init_percpu();
@@ -173,6 +183,32 @@ trap_dispatch(struct Trapframe *tf)
 {
 	// Handle processor exceptions.
 	// LAB 3: Your code here.
+	// TODO: Start using T_* instead of interrupt numbers
+	// TODO: Use a switch
+	// TODO: Remove debugging printings
+	if (tf->tf_trapno == 3) {
+		cprintf("DEBUGGING: Trap dispatch - Breakpoint\n");
+		monitor(tf);
+		return;
+	}
+	if (tf->tf_trapno == 14) {
+		cprintf("DEBUGGING: Page fault\n");
+		page_fault_handler(tf);
+		return;
+	}
+	if (tf->tf_trapno == T_SYSCALL) {
+		cprintf("DEBUGGING: system call\n");
+		struct PushRegs regs = tf->tf_regs;
+		int32_t retValue;
+		retValue = syscall(regs.reg_eax,// system call number - eax
+				regs.reg_edx,	// a1 - edx
+				regs.reg_ecx,	// a2 - ecx
+				regs.reg_ebx,	// a3 - ebx
+				regs.reg_edi,	// a4 - edi
+				regs.reg_esi);	// a5 - esi
+		tf->tf_regs.reg_eax = retValue;
+		return;
+	}
 
 	// Handle spurious interrupts
 	// The hardware sometimes raises these because of noise on the
@@ -268,6 +304,8 @@ page_fault_handler(struct Trapframe *tf)
 	// Handle kernel-mode page faults.
 
 	// LAB 3: Your code here.
+	if ((tf->tf_cs & 3) == 0) // Checks last 2 bits are 0
+		panic("Page fault on kernel mode!");
 
 	// We've already handled kernel-mode exceptions, so if we get here,
 	// the page fault happened in user mode.

@@ -1,0 +1,17 @@
+1. It should be uintptr_t, since it is storing a virtual address.
+3. Users programs won't be able to read or write the kernel's adresses because of the virtual memory system, in which the page tables that point to these physical adresses have protection bits, so that a user program won't have permission. This is set by the PTE_U bit.
+4. This operating system can support 66556K memory, as stated by the qemu. It is also possible to calculate using PGSIZE * npages. This is because the machine we are emulating only has this much memory.
+5. In the JOS current design, the maximum amount of physical memory possible is 256 MB, since this is the space from KERNBASE to 2^32. This overhead could be broken down if didn't map all the physical memory every time.
+6.
+
+The point in entry.S that in which the jump occurs is:
+
+        # Now paging is enabled, but we're still running at a low EIP
+        # (why is this okay?).  Jump up above KERNBASE before entering
+        # C code.
+        mov     $relocated, %eax
+        jmp     *%eax
+relocated:
+
+
+This is possible because the page directory that was set also maps the low virtual adresses to the low physical adresses to avoid a crash when we jump to high EIP. It also maps the high virtual adresses, which is what we want, so this trasition is necessary, since we'll keep the kernel at the high region of the virtual memory. 
