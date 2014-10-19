@@ -322,29 +322,24 @@ page_init(void)
 	//	page_free_list = &pages[i];
 	//}
 	//TODO: Check if it's needed to make pp_ref = 0, in the other pages
-
 	pages[0].pp_ref = 0;
 	pages[0].pp_link = NULL;
 
-	size_t i;
-	for (i = 1; i < npages_basemem; i++) {
-		pages[i].pp_ref = 0;
-		pages[i].pp_link = page_free_list;
-		page_free_list = &pages[i];
-	}
-
+	size_t n_mpentry = ROUNDDOWN(MPENTRY_PADDR, PGSIZE)/PGSIZE;
+	size_t n_io_hole_start = npages_basemem;
 	char *first_free_page = (char *) boot_alloc(0);
 	size_t first_free_page_number = PGNUM(PADDR(first_free_page));
 
-	for (i = npages_basemem; i < first_free_page_number; i++) {
-		pages[i].pp_ref = 0;
-		pages[i].pp_link = NULL;
-	}
-
-	for (i = first_free_page_number; i < npages; i++) {
-		pages[i].pp_ref = 0;
-		pages[i].pp_link = page_free_list;
-		page_free_list = &pages[i];
+	size_t i;
+	for (i = 0; i < npages; i++) {
+		if (i == 0 || i == n_mpentry || (n_io_hole_start <= i && i < first_free_page_number)) {
+			pages[i].pp_ref = 0;
+			pages[i].pp_link = NULL;
+		} else {
+			pages[i].pp_ref = 0;
+			pages[i].pp_link = page_free_list;
+			page_free_list = &pages[i];
+		}
 	}
 }
 
@@ -638,7 +633,20 @@ mmio_map_region(physaddr_t pa, size_t size)
 	// Hint: The staff solution uses boot_map_region.
 	//
 	// Your code here:
-	panic("mmio_map_region not implemented");
+	size_t map_size = ROUNDUP(size, PGSIZE);
+	if (base + map_size > MMIOLIM) {
+		panic("mmio_map_region: overflow on MMIO map region");
+	}
+	uintptr_t va = base + PGOFF(pa);
+
+	// Map region. va and pa page aligned. map_size multiple of size.
+	boot_map_region(kern_pgdir, va, map_size, pa, PTE_W | PTE_PCD | PTE_PWT);
+
+	// Update base
+	base += map_size;
+
+	// Return base of mapped region
+	return (void *) (base - map_size);
 }
 
 static uintptr_t user_mem_check_addr;
