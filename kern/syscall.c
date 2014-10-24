@@ -294,6 +294,10 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 		cprintf("DEBUGGING: Calling sys_env_destroy!\n");
 		ret = sys_env_destroy((envid_t) a1);
 		break;
+	case SYS_yield:
+		cprintf("DEBUGGING: Calling sys_yield!\n");
+		sys_yield();
+		break;
 	default:
 		return -E_NO_SYS;
 	}
