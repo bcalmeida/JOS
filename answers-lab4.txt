@@ -1,0 +1,9 @@
+ANSWERS-LAB4
+
+1. The kernel is linked at a high address, so the references inside mpentry.S are all high addresses. With that, when running these instructions at low address in the AP's that are booting, we would have a page fault since there is no paging enabled for these adresses. So we need some way of storing the actual physical address of the reference. To do that, we use MPBOOTPHYS.
+
+2. ?
+
+3. The virtual address of e is above KERNBASE, so it is mapped in both page directories, the one before lcr3, and the one after, since all pages directories have the same mapping above KERNBASE.
+
+4. When there is a trap, the code in trap(), in trap.c, saves the trapframe of the environment in env->env_tf. So if there is a switch in the environment running, we can later run this environment from any CPU, since the CPU will just need to pop the registers in tf.
