@@ -276,7 +276,13 @@ mem_init_mp(void)
 	//     Permissions: kernel RW, user NONE
 	//
 	// LAB 4: Your code here:
-
+	uint32_t i;
+	for (i = 0; i < NCPU; i++) {
+		uintptr_t kstacktop_i = KSTACKTOP - i * (KSTKSIZE + KSTKGAP);
+		uintptr_t kstackbot_i = kstacktop_i - KSTKSIZE;
+		physaddr_t kstackpa_i = PADDR(&percpu_kstacks[i]);
+		boot_map_region(kern_pgdir, kstackbot_i, KSTKSIZE, kstackpa_i, PTE_W);
+	}
 }
 
 // --------------------------------------------------------------
