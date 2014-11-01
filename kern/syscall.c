@@ -364,7 +364,67 @@ static int
 sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, unsigned perm)
 {
 	// LAB 4: Your code here.
-	panic("sys_ipc_try_send not implemented");
+	// Tries to retrieve the environment
+	struct Env *e;
+	envid2env(envid, &e, 0); // Set to 0: can send to anyone
+	if (!e) {
+		return -E_BAD_ENV;
+	}
+
+	// Checks if the receiver is receiving
+	if (!e->env_ipc_recving) {
+		return -E_IPC_NOT_RECV;
+	}
+
+	// If the receiver is accepting a page
+	// and the sender is trying to send a page
+	if (((uint32_t) e->env_ipc_dstva) < UTOP && ((uint32_t) srcva) < UTOP) {
+		// Checks if va is page aligned
+		if (((uint32_t) srcva) % PGSIZE != 0)
+			return -E_INVAL;
+
+		// Checks if permission is appropiate
+		if ((perm & (~PTE_SYSCALL)) != 0 ||   // No bit out of PTE_SYSCALL allowed
+		    (perm & (PTE_U | PTE_P)) == 0) {  // These bits must be set
+			return -E_INVAL;
+		}
+
+		// Lookup for the physical page that is mapped at srcva
+		// If srcva is not mapped in srcenv address space, pp is null
+		pte_t *pte;
+		struct PageInfo *pp = page_lookup(curenv->env_pgdir, srcva, &pte);
+		if (!pp) {
+			return -E_INVAL;
+		}
+
+		// Checks if srcva is read-only in srcenv, and it is trying to
+		// permit writing in dstva
+		if (!(*pte & PTE_W) && (perm & PTE_W)) {
+			return -E_INVAL;
+		}
+
+		// Tries to map the physical page at dstva on dstenv address space
+		// Fails if there is no memory to allocate a page table, if needed
+		int error = page_insert(e->env_pgdir, pp, e->env_ipc_dstva, perm);
+		if (error < 0) {
+			return -E_NO_MEM;
+		}
+
+		// Page successfully transfered
+		e->env_ipc_perm = perm;
+	} else {
+	// The receiver isn't accepting a page
+		e->env_ipc_perm = 0;
+	}
+
+	// Deliver 'value' to the receiver
+	e->env_ipc_recving = 0;
+	e->env_ipc_from = curenv->env_id;
+	e->env_ipc_value = value;
+
+	// The receiver has successfully received. Make it runnable
+	e->env_status = ENV_RUNNABLE;
+	return 0;
 }
 
 // Block until a value is ready.  Record that you want to receive
@@ -382,7 +442,21 @@ static int
 sys_ipc_recv(void *dstva)
 {
 	// LAB 4: Your code here.
-	panic("sys_ipc_recv not implemented");
+	// Checks if va is page aligned, given that it is valid
+	if (((uint32_t) dstva < UTOP) &&  (((uint32_t) dstva) % PGSIZE != 0)) {
+		return -E_INVAL;
+	}
+
+	// Record that you want to receive
+	curenv->env_ipc_recving = 1;
+	curenv->env_ipc_dstva = dstva;
+
+	// Put the return value manually, since this never returns
+	curenv->env_tf.tf_regs.reg_eax = 0;
+
+	// Give up the cpu and wait until receiving
+	curenv->env_status = ENV_NOT_RUNNABLE;
+	sched_yield();
 	return 0;
 }
 
@@ -444,6 +518,15 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 	case SYS_env_set_pgfault_upcall:
 		cprintf("DEBUGGING: Calling sys_env_set_pgfault_upcall!\n");
 		ret = (int32_t) sys_env_set_pgfault_upcall((envid_t) a1, (void *) a2);
+		break;
+	case SYS_ipc_try_send:
+		cprintf("DEBUGGING: Calling sys_ipc_try_send!\n");
+		ret = (int32_t) sys_ipc_try_send((envid_t) a1, (uint32_t) a2,
+						   (void*) a3, (unsigned) a4);
+		break;
+	case SYS_ipc_recv:
+		cprintf("DEBUGGING: Calling sys_ipc_recv!\n");
+		ret = (int32_t) sys_ipc_recv((void*) a1);
 		break;
 	default:
 		return -E_NO_SYS;

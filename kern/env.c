@@ -537,7 +537,7 @@ env_run(struct Env *e)
 
 	// LAB 3: Your code here.
 	// Step 1
-	if (curenv)
+	if (curenv && curenv->env_status == ENV_RUNNING)
 		curenv->env_status = ENV_RUNNABLE;
 	curenv = e;
 	e->env_status = ENV_RUNNING;
