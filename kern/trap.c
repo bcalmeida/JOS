@@ -67,6 +67,7 @@ static const char *trapname(int trapno)
 
 extern void* handler_syscall;
 extern uint32_t handlers[];
+extern uint32_t handlers_irq[];
 void
 trap_init(void)
 {
@@ -82,6 +83,11 @@ trap_init(void)
 
 	// For system call
 	SETGATE(idt[T_SYSCALL], 0, GD_KT, &handler_syscall, 3);
+
+	// External interrupts
+	for (i = 0; i <= 15; i++) {
+		SETGATE(idt[IRQ_OFFSET + i], 0, GD_KT, handlers_irq[i],0);
+	}
 
 	// Per-CPU setup 
 	trap_init_percpu();
@@ -243,8 +249,14 @@ trap_dispatch(struct Trapframe *tf)
 	// Handle clock interrupts. Don't forget to acknowledge the
 	// interrupt using lapic_eoi() before calling the scheduler!
 	// LAB 4: Your code here.
+	if(tf->tf_trapno == IRQ_OFFSET + IRQ_TIMER) {
+		cprintf("DEBUGGING: Trap dispatch - Clock interrupt\n");
+		lapic_eoi();
+		sched_yield();
+	}
 
 	// Unexpected trap: The user process or the kernel has a bug.
+	cprintf("DEBUGGING: Unexpected trap\n");
 	print_trapframe(tf);
 	if (tf->tf_cs == GD_KT)
 		panic("unhandled trap in kernel");

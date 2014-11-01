@@ -48,6 +48,7 @@
  * Lab 3: Your code here for generating entry points for the different traps.
  */
 
+# Handlers for process exceptions
 TRAPHANDLER_NOEC(handler0, 0)
 TRAPHANDLER_NOEC(handler1, 1)
 TRAPHANDLER_NOEC(handler2, 2)
@@ -68,6 +69,25 @@ TRAPHANDLER_NOEC(handler16, 16)
 TRAPHANDLER(handler17, 17)
 TRAPHANDLER_NOEC(handler18, 18)
 TRAPHANDLER_NOEC(handler19, 19)
+
+# Handlers for external interrupts
+TRAPHANDLER_NOEC(handler_irq0, IRQ_OFFSET + 0)
+TRAPHANDLER_NOEC(handler_irq1, IRQ_OFFSET + 1)
+TRAPHANDLER_NOEC(handler_irq2, IRQ_OFFSET + 2)
+TRAPHANDLER_NOEC(handler_irq3, IRQ_OFFSET + 3)
+TRAPHANDLER_NOEC(handler_irq4, IRQ_OFFSET + 4)
+TRAPHANDLER_NOEC(handler_irq5, IRQ_OFFSET + 5)
+TRAPHANDLER_NOEC(handler_irq6, IRQ_OFFSET + 6)
+TRAPHANDLER_NOEC(handler_irq7, IRQ_OFFSET + 7)
+TRAPHANDLER_NOEC(handler_irq8, IRQ_OFFSET + 8)
+TRAPHANDLER_NOEC(handler_irq9, IRQ_OFFSET + 9)
+TRAPHANDLER_NOEC(handler_irq10,IRQ_OFFSET + 10)
+TRAPHANDLER_NOEC(handler_irq11,IRQ_OFFSET + 11)
+TRAPHANDLER_NOEC(handler_irq12,IRQ_OFFSET + 12)
+TRAPHANDLER_NOEC(handler_irq13,IRQ_OFFSET + 13)
+TRAPHANDLER_NOEC(handler_irq14,IRQ_OFFSET + 14)
+TRAPHANDLER_NOEC(handler_irq15,IRQ_OFFSET + 15)
+
 # For system call
 TRAPHANDLER_NOEC(handler_syscall, T_SYSCALL)
 
@@ -116,3 +136,22 @@ handlers:
 	.long handler17
 	.long handler18
 	.long handler19
+
+.globl handlers_irq
+handlers_irq:
+	.long handler_irq0
+	.long handler_irq1
+	.long handler_irq2
+	.long handler_irq3
+	.long handler_irq4
+	.long handler_irq5
+	.long handler_irq6
+	.long handler_irq7
+	.long handler_irq8
+	.long handler_irq9
+	.long handler_irq10
+	.long handler_irq11
+	.long handler_irq12
+	.long handler_irq13
+	.long handler_irq14
+	.long handler_irq15
