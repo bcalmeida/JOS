@@ -475,57 +475,57 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 	// TODO: Remove debugging printings
 	switch (syscallno) {
 	case SYS_cputs:
-		cprintf("DEBUGGING: Calling sys_cputs!\n");
+		//cprintf("DEBUG-SYSCALL: Calling sys_cputs!\n");
 		sys_cputs((char *) a1, (size_t) a2);
 		break;
 	case SYS_cgetc:
-		cprintf("DEBUGGING: Calling sys_cgetc!\n");
+		//cprintf("DEBUG-SYSCALL: Calling sys_cgetc!\n");
 		ret = sys_cgetc();
 		break;
 	case SYS_getenvid:
-		cprintf("DEBUGGING: Calling sys_getenvid!\n");
+		//cprintf("DEBUG-SYSCALL: Calling sys_getenvid!\n");
 		ret = (int32_t) sys_getenvid();
 		break;
 	case SYS_env_destroy:
-		cprintf("DEBUGGING: Calling sys_env_destroy!\n");
+		//cprintf("DEBUG-SYSCALL: Calling sys_env_destroy!\n");
 		ret = sys_env_destroy((envid_t) a1);
 		break;
 	case SYS_yield:
-		cprintf("DEBUGGING: Calling sys_yield!\n");
+		//cprintf("DEBUG-SYSCALL: Calling sys_yield!\n");
 		sys_yield();
 		break;
 	case SYS_exofork:
-		cprintf("DUBUGGING: Calling sys_exofork!\n");
+		//cprintf("DEBUG-SYSCALL: Calling sys_exofork!\n");
 		ret = (int32_t) sys_exofork();
 		break;
 	case SYS_env_set_status:
-		cprintf("DUBUGGING: Calling sys_env_set_status!\n");
+		//cprintf("DEBUG-SYSCALL: Calling sys_env_set_status!\n");
 		ret = (int32_t) sys_env_set_status((envid_t) a1, (int) a2);
 		break;
 	case SYS_page_alloc:
-		cprintf("DUBUGGING: Calling sys_page_alloc!\n");
+		//cprintf("DEBUG-SYSCALL: Calling sys_page_alloc!\n");
 		ret = (int32_t) sys_page_alloc((envid_t) a1, (void *) a2, (int) a3);
 		break;
 	case SYS_page_map:
-		cprintf("DUBUGGING: Calling sys_page_map!\n");
+		//cprintf("DEBUG-SYSCALL: Calling sys_page_map!\n");
 		ret = (int32_t) sys_page_map((envid_t) a1, (void *) a2,
 					     (envid_t) a3, (void *) a4, (int) a5);
 		break;
 	case SYS_page_unmap:
-		cprintf("DUBUGGING: Calling sys_page_unmap!\n");
+		//cprintf("DEBUG-SYSCALL: Calling sys_page_unmap!\n");
 		ret = (int32_t) sys_page_unmap((envid_t) a1, (void *) a2);
 		break;
 	case SYS_env_set_pgfault_upcall:
-		cprintf("DEBUGGING: Calling sys_env_set_pgfault_upcall!\n");
+		//cprintf("DEBUG-SYSCALL: Calling sys_env_set_pgfault_upcall!\n");
 		ret = (int32_t) sys_env_set_pgfault_upcall((envid_t) a1, (void *) a2);
 		break;
 	case SYS_ipc_try_send:
-		cprintf("DEBUGGING: Calling sys_ipc_try_send!\n");
+		//cprintf("DEBUG-SYSCALL: Calling sys_ipc_try_send!\n");
 		ret = (int32_t) sys_ipc_try_send((envid_t) a1, (uint32_t) a2,
 						   (void*) a3, (unsigned) a4);
 		break;
 	case SYS_ipc_recv:
-		cprintf("DEBUGGING: Calling sys_ipc_recv!\n");
+		//cprintf("DEBUG-SYSCALL: Calling sys_ipc_recv!\n");
 		ret = (int32_t) sys_ipc_recv((void*) a1);
 		break;
 	default:

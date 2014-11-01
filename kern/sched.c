@@ -29,37 +29,37 @@ sched_yield(void)
 	// below to halt the cpu.
 
 	// LAB 4: Your code here.
-	cprintf("CPU %d: In scheduler, curenv = %p\n", cpunum(), curenv);
+	//cprintf("DEBUG-SCHED: CPU %d - In scheduler, curenv = %p\n", cpunum(), curenv);
 	struct Env *e;
 	if (curenv) {
 		for (e = curenv + 1; e < envs + NENV; e++) {
 			if (e->env_status == ENV_RUNNABLE) {
-				cprintf("CPU %d: going to run env %p\n", cpunum(), e);
+				//cprintf("DEBUG-SCHED: CPU %d: going to run env %p\n", cpunum(), e);
 				env_run(e);
 			}
 		}
 		for (e = envs; e < curenv; e++) {
 			if (e->env_status == ENV_RUNNABLE) {
-				cprintf("CPU %d: going to run env %p\n", cpunum(), e);
+				//cprintf("DEBUG-SCHED: CPU %d: going to run env %p\n", cpunum(), e);
 				env_run(e);
 			}
 		}
 		// If didn't find any runnable, try to keep running curenv
 		if (curenv->env_status == ENV_RUNNING) {
-			cprintf("CPU %d: going to run env %p\n", cpunum(), curenv);
+			//cprintf("DEBUG-SCHED: CPU %d: going to run env %p\n", cpunum(), curenv);
 			env_run(curenv);
 		}
 	} else {
 		for (e = envs; e < envs + NENV; e++) {
 			if (e->env_status == ENV_RUNNABLE) {
-				cprintf("CPU %d: going to run env %p\n", cpunum(), e);
+				//cprintf("DEBUG-SCHED: CPU %d: going to run env %p\n", cpunum(), e);
 				env_run(e);
 			}
 		}
 	}
 
 	// sched_halt never returns
-	cprintf("CPU %d: no env to run found\n", cpunum());
+	//cprintf("DEBUG-SCHED: CPU %d: no env to run found\n", cpunum());
 	sched_halt();
 }
 

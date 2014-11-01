@@ -214,17 +214,17 @@ trap_dispatch(struct Trapframe *tf)
 	// TODO: Use a switch
 	// TODO: Remove debugging printings
 	if (tf->tf_trapno == 3) {
-		cprintf("DEBUGGING: Trap dispatch - Breakpoint\n");
+		//cprintf("DEBUG-TRAP: Trap dispatch - Breakpoint\n");
 		monitor(tf);
 		return;
 	}
 	if (tf->tf_trapno == 14) {
-		cprintf("DEBUGGING: Page fault\n");
+		//cprintf("DEBUG-TRAP: Trap dispatch - Page fault\n");
 		page_fault_handler(tf);
 		return;
 	}
 	if (tf->tf_trapno == T_SYSCALL) {
-		cprintf("DEBUGGING: system call\n");
+		//cprintf("DEBUG-TRAP: Trap dispatch - System Call\n");
 		struct PushRegs regs = tf->tf_regs;
 		int32_t retValue;
 		retValue = syscall(regs.reg_eax,// system call number - eax
@@ -250,13 +250,13 @@ trap_dispatch(struct Trapframe *tf)
 	// interrupt using lapic_eoi() before calling the scheduler!
 	// LAB 4: Your code here.
 	if(tf->tf_trapno == IRQ_OFFSET + IRQ_TIMER) {
-		cprintf("DEBUGGING: Trap dispatch - Clock interrupt\n");
+		//cprintf("DEBUG-TRAP: Trap dispatch - Clock interrupt\n");
 		lapic_eoi();
 		sched_yield();
 	}
 
 	// Unexpected trap: The user process or the kernel has a bug.
-	cprintf("DEBUGGING: Unexpected trap\n");
+	//cprintf("DEBUG-TRAP: Unexpected trap\n");
 	print_trapframe(tf);
 	if (tf->tf_cs == GD_KT)
 		panic("unhandled trap in kernel");
@@ -334,6 +334,7 @@ page_fault_handler(struct Trapframe *tf)
 
 	// Read processor's CR2 register to find the faulting address
 	fault_va = rcr2();
+	//cprintf("DEBUG-TRAP: Page fault on address %x, err = %x\n", fault_va, tf->tf_err);
 
 	// Handle kernel-mode page faults.
 
