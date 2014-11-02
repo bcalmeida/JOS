@@ -2,7 +2,7 @@ ANSWERS-LAB4
 
 1. The kernel is linked at a high address, so the references inside mpentry.S are all high addresses. With that, when running these instructions at low address in the AP's that are booting, we would have a page fault since there is no paging enabled for these adresses. So we need some way of storing the actual physical address of the reference. To do that, we use MPBOOTPHYS.
 
-2. ?
+2. Even though there is a big kernel lock, it is needed to go to the kernel before getting locked. So, if there was only one kernel stack, there would be problems in this point. To avoid that, JOS uses a kernel stack for each CPU.
 
 3. The virtual address of e is above KERNBASE, so it is mapped in both page directories, the one before lcr3, and the one after, since all pages directories have the same mapping above KERNBASE.
 
