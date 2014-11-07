@@ -1,0 +1,49 @@
+ANSWERS-LAB3
+1. If all interrupts were delivered to the same handler, we wouldn't be able to differentiate the case where the interrupts pushes an error code to the stack, and the case where it doesn't.
+
+2. When the user program tries to call int 14, as it doesn't have the permission to do it, the processor calls int 13, which is the general protection fault. As the manual says: "Interrupt or exception via trap or interrupt gate from V86 mode to privilege level other than zero.".
+
+3. If you initialize the IDT with privilege level 0, when the user try to call it a there will be a protection fault. Hence, to make it work we need to set the privilege to 3, so the user can call it, so that no general protection fault is triggered.
+
+4. This protects the system from the user maliciously triggering interrupts. In softint, for example, the user calls a page fault without any reason, and that could be used for malicious purposes and also to reduce the system performance.
+
+Challenge:
+The chosen challenge was the first one: "Challenge! You probably have a lot of very similar code right now, between the lists of TRAPHANDLER in trapentry.S and their installations in trap.c. Clean this up. Change the macros in trapentry.S to automatically generate a table for trap.c to use. Note that you can switch between laying down code and data in the assembler by using the directives .text and .data."
+
+To do this, at the end of the$ file kern/trapentry.S was added a data to be used as an array by the C code. It has the references for all the handlers defined using TRAPHANDLER and TRAPHANDLER_NOEC. The code is this:
+
+.data
+.globl handlers
+handlers:
+        .long handler0
+        .long handler1
+        .long handler2
+        .long handler3
+        .long handler4
+        .long handler5
+        .long handler6
+        .long handler7
+        .long handler8
+        .long handler9
+        .long handler10
+        .long handler11
+        .long handler12
+        .long handler13
+        .long handler14
+        .long handler15
+        .long handler16
+        .long handler17
+        .long handler18
+        .long handler19
+
+At trap.c, instead of various lines, we only need:
+
+extern uint32_t handlers[];
+
+And inside trap_init, we have a loop:
+	int i;
+        for (i = 0; i <= 19; i++) {
+                SETGATE(idt[i], 0, GD_KT, handlers[i], 0);
+        }
+        SETGATE(idt[T_BRKPT], 0, GD_KT, handlers[T_BRKP], 3);
+

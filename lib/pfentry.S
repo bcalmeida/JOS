@@ -66,6 +66,26 @@ _pgfault_upcall:
 	//
 	// LAB 4: Your code here.
 
+	# My method is different. Copy the values to the other stack
+	# in a convinient way, and then pop everything.
+	movl %esp, %ebp		# ebp refers to the exception stack
+	movl 48(%ebp), %esp 	# go to other stack
+
+	pushl 40(%ebp)		# eip - ORDER SWITCHED WITH EFLAGS
+	pushl 44(%ebp)      	# eflags
+	pushl 36(%ebp)		# all the 8 remaining regs
+	pushl 32(%ebp)
+	pushl 28(%ebp)
+	pushl 24(%ebp)
+	pushl 20(%ebp)
+	pushl 16(%ebp)
+	pushl 12(%ebp)
+	pushl 8(%ebp)
+
+	popal			# now just pop everything!
+	popfl
+	ret
+
 	// Restore the trap-time registers.  After you do this, you
 	// can no longer modify any general-purpose registers.
 	// LAB 4: Your code here.
