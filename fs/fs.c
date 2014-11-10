@@ -129,6 +129,16 @@ fs_init(void)
 	
 }
 
+// Auxiliary function created by me
+static void*
+blockno_to_va(uint32_t blockno)
+{
+	if (blockno >= NDIRECT + NINDIRECT)
+		panic("blockno_to_va: invalid blockno");
+
+	return (void*) (DISKMAP + blockno*BLKSIZE);
+}
+
 // Find the disk block number slot for the 'filebno'th block in file 'f'.
 // Set '*ppdiskbno' to point to that slot.
 // The slot will be one of the f->f_direct[] entries,
@@ -149,7 +159,39 @@ static int
 file_block_walk(struct File *f, uint32_t filebno, uint32_t **ppdiskbno, bool alloc)
 {
        // LAB 5: Your code here.
-       panic("file_block_walk not implemented");
+	// Checks if filebno is valid
+	if (filebno >= NDIRECT + NINDIRECT)
+		return -E_INVAL;
+
+	// Checks if it is one of the direct blocks
+	if (filebno < NDIRECT) {
+		*ppdiskbno = &(f->f_direct[filebno]);
+		return 0;
+	}
+
+	// If we got here, filebno is in the indirect block
+	// If there is no indirect block, try to allocate
+	if (f->f_indirect == 0) {
+		if (alloc) {
+			// Allocate the a new block
+			int newblkno;
+			if ((newblkno = alloc_block()) < 0)
+				return -E_NO_DISK;
+
+			// Clear the allocated block
+			memset(blockno_to_va(newblkno), 0, BLKSIZE);
+
+			// Make it the indirect block
+			f->f_indirect = newblkno;
+		} else {
+			return -E_NOT_FOUND;
+		}
+	}
+
+	// Access the indirect block
+	uint32_t *indirect_blk = (uint32_t *) blockno_to_va(f->f_indirect);
+	*ppdiskbno = &indirect_blk[filebno - NDIRECT];
+	return 0;
 }
 
 // Set *blk to the address in memory where the filebno'th
@@ -164,7 +206,30 @@ int
 file_get_block(struct File *f, uint32_t filebno, char **blk)
 {
        // LAB 5: Your code here.
-       panic("file_get_block not implemented");
+	// Retrieve the blockno_entry of the 'filebno'th block of file 'f'
+	uint32_t *blockno_entry;
+	int r;
+	if ((r = file_block_walk(f, filebno, &blockno_entry, 1)) < 0) {
+		return r; // -E_INVAL or -E_NO_DISK
+	}
+
+	// If the block is not allocated, allocate it
+	if (*blockno_entry == 0) {
+		// Tries to allocate a new block
+		int newblkno;
+		if ((newblkno = alloc_block()) < 0)
+			return -E_NO_DISK;
+
+		// Clear the allocated block
+		memset(blockno_to_va(newblkno), 0, BLKSIZE);
+
+		// Update the value
+		*blockno_entry = newblkno;
+	}
+
+	// Set *blk to the va where the block is mapped
+	*blk = blockno_to_va(*blockno_entry);
+	return 0;
 }
 
 // Try to find a file named "name" in dir.  If so, set *file to it.
