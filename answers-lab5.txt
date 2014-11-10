@@ -1,0 +1,4 @@
+ANSWERS-LAB5
+
+1. Do you have to do anything else to ensure that this I/O privilege setting is saved and restored properly when you subsequently switch from one environment to another? Why?
+Answer: There is no need to do anything else because this is information is store in the EFLAGS register, which is popped and restored with the Trapframe, so that is already handled.
