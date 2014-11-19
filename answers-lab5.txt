@@ -2,3 +2,314 @@ ANSWERS-LAB5
 
 1. Do you have to do anything else to ensure that this I/O privilege setting is saved and restored properly when you subsequently switch from one environment to another? Why?
 Answer: There is no need to do anything else because this is information is store in the EFLAGS register, which is popped and restored with the Trapframe, so that is already handled.
+
+CHALLENGE: Eviction policy for block cache
+At the end of this file there is the git diff with the changed code in bc.c. There is also the printings of some tests.
+
+**IMPLEMENTATION**
+To implement this challenge, the eviction policy chosen was the random eviction policy, which in practical terms has almost the same efficiency as a LRU cache, but is easier to maintain. To do this, it was included the following global variables in bc.c that represent the cache:
+
++#define CACHE_SIZE 10
++uint32_t cache[CACHE_SIZE];
++uint32_t cached_blocks = 0;
++
+
+Every time there is a page fault, the block is added to the cache by calling the function add_to_cache(blockno): 
+
++// Adds a block to the cache, enforcing the eviction policy
++void
++add_to_cache(uint32_t blockno) {
++	if (cached_blocks == CACHE_SIZE) {
++		uint32_t removed = evict();
++		cache[removed] = blockno;
++	} else {
++		cache[cached_blocks] = blockno;
++		cached_blocks++;
++	}
++}
+
+If the cache is full, it calls evict, that write back if dirty, and unmap the page.
+
++// Evicts a random block from the cache. Return the position available in cache.
++uint32_t
++evict(void) {
++	int r;
++
++	// Use the random number generator to pick a block to evict
++	uint32_t removed_position = random() % CACHE_SIZE;
++
++	// Retrive the blockno, it's va and it's page number
++	uint32_t blockno = cache[removed_position];
++	void *va = (void *) (DISKMAP + blockno*BLKSIZE);
++	uint32_t pn = ((uint32_t) va)/PGSIZE;
++
++	// If the block is dirty, write it back to disk
++	cprintf("Evicting block %d!\n", blockno);
++	if (uvpt[pn] & PTE_D) {
++		cprintf("Writing back block %d...\n");
++		if ((r = ide_write(blockno*BLKSECTS, va, BLKSECTS)) < 0)
++			panic("in evict, ide_write: %e", r);
++	}
++
++	// Evict the block, by unmapping the page corresponding to the block
++	if ((r = sys_page_unmap(0, va)) < 0)
++		panic("in evict, sys_page_unmap: %e", r);
++
++	// Return the position of the removed block
++	return removed_position;
++}
+
+The function random(), that evict uses is implemented using the xor shift algorithm, to create a simple pseudorandom number generator:
+
++// Pseudorandom number generator using xorshift algorithm
++uint32_t
++random(void) {
++  static uint32_t x = 123456789;
++  static uint32_t y = 362436069;
++  static uint32_t z = 521288629;
++  static uint32_t w = 88675123;
++  uint32_t t;
++
++  t = x ^ (x << 11);
++  x = y; y = z; z = w;
++  return w = w ^ (w >> 19) ^ (t ^ (t >> 8));
++}
+
+
+** GIT DIFF **
+Below is the complete git diff for the challenge:
+
+diff --git a/fs/bc.c b/fs/bc.c
+index dd238ee..0eae239 100644
+--- a/fs/bc.c
++++ b/fs/bc.c
+@@ -1,6 +1,10 @@
+ 
+ #include "fs.h"
+ 
++#define CACHE_SIZE 10
++uint32_t cache[CACHE_SIZE];
++uint32_t cached_blocks = 0;
++
+ // Return the virtual address of this disk block.
+ void*
+ diskaddr(uint32_t blockno)
+@@ -24,6 +28,62 @@ va_is_dirty(void *va)
+ 	return (uvpt[PGNUM(va)] & PTE_D) != 0;
+ }
+ 
++// Pseudorandom number generator using xorshift algorithm
++uint32_t
++random(void) {
++  static uint32_t x = 123456789;
++  static uint32_t y = 362436069;
++  static uint32_t z = 521288629;
++  static uint32_t w = 88675123;
++  uint32_t t;
++
++  t = x ^ (x << 11);
++  x = y; y = z; z = w;
++  return w = w ^ (w >> 19) ^ (t ^ (t >> 8));
++}
++
++// Evicts a random block from the cache. Return the position available in cache.
++uint32_t
++evict(void) {
++	int r;
++
++	// Use the random number generator to pick a block to evict
++	uint32_t removed_position = random() % CACHE_SIZE;
++
++	// Retrive the blockno, it's va and it's page number
++	uint32_t blockno = cache[removed_position];
++	void *va = (void *) (DISKMAP + blockno*BLKSIZE);
++	uint32_t pn = ((uint32_t) va)/PGSIZE;
++
++	// If the block is dirty, write it back to disk
++	cprintf("Evicting block %d!\n", blockno);
++	if (uvpt[pn] & PTE_D) {
++		cprintf("Writing back block %d...\n");
++		if ((r = ide_write(blockno*BLKSECTS, va, BLKSECTS)) < 0)
++			panic("in evict, ide_write: %e", r);
++	}
++
++	// Evict the block, by unmapping the page corresponding to the block
++	if ((r = sys_page_unmap(0, va)) < 0)
++		panic("in evict, sys_page_unmap: %e", r);
++
++	// Return the position of the removed block
++	return removed_position;
++}
++
++// Adds a block to the cache, enforcing the eviction policy
++void
++add_to_cache(uint32_t blockno) {
++	if (cached_blocks == CACHE_SIZE) {
++		uint32_t removed = evict();
++		cache[removed] = blockno;
++	} else {
++		cache[cached_blocks] = blockno;
++		cached_blocks++;
++	}
++}
++
++
+ // Fault any disk block that is read in to memory by
+ // loading it from disk.
+ static void
+@@ -73,6 +133,12 @@ bc_pgfault(struct UTrapframe *utf)
+ 	// in?)
+ 	if (bitmap && block_is_free(blockno))
+ 		panic("reading free block %08x\n", blockno);
++
++	// Challenge: eviction policy for data blocks
++	uint32_t nbitblocks = 1 + ((super->s_nblocks - 1)/BLKBITSIZE);
++	// Shouldn't cache blocks 0 or 1
++	if (blockno > 1)
++		add_to_cache(blockno);
+ }
+ 
+
+** TEST **
+To show it's correctness, if we run user/testfile, that tests using a big file, with the console printings on, we have the following:
+
+make[1]: Entering directory `/afs/athena.mit.edu/user/b/c/bcalm/OS/lab'
++ cc kern/init.c
++ cc[USER] fs/bc.c
++ ld obj/fs/fs
++ ld obj/kern/kernel
++ mk obj/kern/kernel.img
+make[1]: `obj/fs/fs.img' is up to date.
+make[1]: Leaving directory `/afs/athena.mit.edu/user/b/c/bcalm/OS/lab'
+qemu -nographic -hda obj/kern/kernel.img -serial mon:stdio -gdb tcp::26000 -D qemu.log -smp 1 -hdb obj/fs/fs.img 
+6828 decimal is 15254 octal!
+Physical memory: 66556K available, base = 640K, extended = 65532K
+check_page_alloc() succeeded!
+check_page() succeeded!
+check_kern_pgdir() succeeded!
+check_page_installed_pgdir() succeeded!
+SMP: CPU 0 found 1 CPU(s)
+enabled interrupts: 1 2 4
+FS is running
+FS can do I/O
+Device 1 presence: 1
+block cache is good
+superblock is good
+bitmap is good
+alloc_block is good
+file_open is good
+file_get_block is good
+file_flush is good
+file_truncate is good
+file rewrite is good
+serve_open is good
+file_stat is good
+file_read is good
+file_close is good
+stale fileid is good
+file_write is good
+file_read after file_write is good
+open is good
+Evicting block 108!
+Writing back block 108...
+Evicting block 2!
+Evicting block 110!
+Writing back block 110...
+Evicting block 2!
+Evicting block 114!
+Writing back block 114...
+Evicting block 106!
+Writing back block 106...
+Evicting block 111!
+Writing back block 111...
+Evicting block 2!
+Evicting block 115!
+Writing back block 115...
+Evicting block 3!
+Evicting block 104!
+Evicting block 103!
+Evicting block 113!
+Writing back block 113...
+Evicting block 118!
+Writing back block 118...
+Evicting block 117!
+Writing back block 117...
+Evicting block 109!
+Writing back block 109...
+Evicting block 120!
+Writing back block 120...
+Evicting block 119!
+Writing back block 119...
+Evicting block 124!
+Writing back block 124...
+Evicting block 112!
+Writing back block 112...
+Evicting block 122!
+Writing back block 122...
+Evicting block 2!
+Evicting block 126!
+Writing back block 126...
+Evicting block 125!
+Writing back block 125...
+Evicting block 116!
+Writing back block 116...
+Evicting block 121!
+Writing back block 121...
+Evicting block 131!
+Writing back block 131...
+Evicting block 129!
+Writing back block 129...
+Evicting block 127!
+Writing back block 127...
+Evicting block 130!
+Writing back block 130...
+Evicting block 107!
+Writing back block 107...
+Evicting block 123!
+Writing back block 123...
+Evicting block 2!
+Evicting block 134!
+Evicting block 135!
+Evicting block 104!
+Evicting block 2!
+Evicting block 137!
+Evicting block 132!
+Evicting block 136!
+Evicting block 133!
+Evicting block 2!
+Evicting block 111!
+Evicting block 109!
+Evicting block 117!
+Evicting block 112!
+Evicting block 114!
+Evicting block 2!
+Evicting block 103!
+Evicting block 107!
+Evicting block 104!
+Evicting block 116!
+Evicting block 108!
+Evicting block 119!
+Evicting block 115!
+Evicting block 122!
+Evicting block 118!
+Evicting block 2!
+Evicting block 121!
+Evicting block 125!
+Evicting block 126!
+Evicting block 124!
+Evicting block 127!
+Evicting block 123!
+Evicting block 129!
+Evicting block 131!
+Evicting block 128!
+Evicting block 130!
+Evicting block 120!
+Evicting block 117!
+Evicting block 134!
+large file is good
+Evicting block 135!
+No runnable environments in the system!
+Welcome to the JOS kernel monitor!
+Type 'help' for a list of commands.
+K> QEMU: Terminated
+
