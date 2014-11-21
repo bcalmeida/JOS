@@ -128,6 +128,13 @@ devfile_read(struct Fd *fd, void *buf, size_t n)
 }
 
 
+// Auxiliary function created by me. Return the minimum.
+static size_t
+min_size(size_t a, size_t b) {
+	if (a > b) return b;
+	return a;
+}
+
 // Write at most 'n' bytes from 'buf' to 'fd' at the current seek position.
 //
 // Returns:
@@ -141,7 +148,22 @@ devfile_write(struct Fd *fd, const void *buf, size_t n)
 	// remember that write is always allowed to write *fewer*
 	// bytes than requested.
 	// LAB 5: Your code here
-	panic("devfile_write not implemented");
+
+	// Build up arguments of the write request
+	// The file to write is stored in the request req_fileid
+	fsipcbuf.write.req_fileid = fd->fd_file.id;
+	// The size is capped to the size of the request buffer
+	size_t n_real = min_size(n, sizeof(fsipcbuf.write.req_buf));
+	fsipcbuf.write.req_n = n_real;
+	// The data to write is stored in the request buffer
+	memmove(fsipcbuf.write.req_buf, buf, n_real);
+
+	// Send request via fsipc
+	int r;
+	if ((r = fsipc(FSREQ_WRITE, NULL)) < 0) // Error occurred
+		return r;
+	assert(r <= n_real); // Number of bytes written should be <= n_real
+	return r;
 }
 
 static int

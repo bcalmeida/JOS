@@ -214,7 +214,29 @@ serve_read(envid_t envid, union Fsipc *ipc)
 		cprintf("serve_read %08x %08x %08x\n", envid, req->req_fileid, req->req_n);
 
 	// Lab 5: Your code here:
-	return 0;
+	// First: Find the relevant open file
+	struct OpenFile *o;
+	int r;
+	if ((r = openfile_lookup(envid, req->req_fileid, &o)) < 0)
+		return r;
+
+	// Second: Call the relevant file system function, in this case file_read.
+	// We put the data in ret (&ipc->readRet), which is in the shared page,
+	// so the client has access to the data read.
+	struct File *file_to_read = o->o_file;
+	size_t count = req->req_n;
+	off_t offset = o->o_fd->fd_offset;
+	r = file_read(file_to_read, ret, count, offset);
+
+	// On failure, return the error code to the client.
+	if (r < 0) {
+		return r;
+	// On success, update the seek position and return the number of bytes read
+	} else {
+		uint32_t bytes_read = r;
+		o->o_fd->fd_offset += bytes_read;
+		return bytes_read;
+	}
 }
 
 
@@ -229,7 +251,27 @@ serve_write(envid_t envid, struct Fsreq_write *req)
 		cprintf("serve_write %08x %08x %08x\n", envid, req->req_fileid, req->req_n);
 
 	// LAB 5: Your code here.
-	panic("serve_write not implemented");
+	// First: Find the relevant open file
+	struct OpenFile *o;
+	int r;
+	if ((r = openfile_lookup(envid, req->req_fileid, &o)) < 0)
+		return r;
+
+	// Second: Call the relevant file system function, in this case file_write
+	struct File *file_to_write = o->o_file;
+	size_t count = req->req_n;
+	off_t offset = o->o_fd->fd_offset;
+	r = file_write(file_to_write, req->req_buf, count, offset);
+
+	// On failure, return the error code to the client
+	if (r < 0) {
+		return r;
+	// On success, update the seek position and return the number of bytes written
+	} else {
+		uint32_t bytes_written = r;
+		o->o_fd->fd_offset += bytes_written;
+		return bytes_written;
+	}
 }
 
 // Stat ipc->stat.req_fileid.  Return the file's struct Stat to the
