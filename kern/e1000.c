@@ -5,8 +5,6 @@
 #include <kern/e1000.h>
 #include <kern/pmap.h>
 
-#define NUM_TX_DESC 16
-
 volatile uint32_t *e1000; // Pointer to the start of E1000's MMIO region
 char *buffers[NUM_TX_DESC];
 struct tx_desc *tx_ring;
@@ -96,7 +94,7 @@ void
 transmit_packet(void *buf, size_t size)
 {
 	// Initial checkings
-	if (size > 1518)
+	if (size > MAX_PACKET_SIZE)
 		panic("Packet size is bigger than the maximum allowed");
 	if (!buf)
 		panic("Null pointer passed");

@@ -3,6 +3,10 @@
 
 #include <kern/pci.h>
 
+// Constants
+#define MAX_PACKET_SIZE 1518
+#define NUM_TX_DESC 16
+
 // Macro to access the registers in MMIO
 #define E1000_REG(offset) *(e1000 + (offset>>2))
 
@@ -42,6 +46,7 @@
 
 /* Functions headers */
 int attach_e1000(struct pci_func *pcif);
+void transmit_packet(void *buf, size_t size);
 
 /* Structures */
 

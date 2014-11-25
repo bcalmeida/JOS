@@ -12,6 +12,7 @@
 #include <kern/console.h>
 #include <kern/sched.h>
 #include <kern/time.h>
+#include <kern/e1000.h>
 
 // Print a string to the system console.
 // The string is exactly 'len' characters long.
@@ -499,6 +500,23 @@ sys_time_msec(void)
 	return time_msec();
 }
 
+// Asks the driver to transmit a packet. The packet may be dropped if
+// E1000 transmission ring is full, but it still counts as success.
+// Returns 0 on success, -E_INVAL if invalid arguments
+static int
+sys_transmit_packet(void *buf, size_t size) {
+	// Check arguments
+	// buf should be in user space
+	if (!buf || ((uint32_t) buf) > UTOP)
+		return -E_INVAL;
+	// size should not exceed the maximum
+	if (size > MAX_PACKET_SIZE)
+		return -E_INVAL;
+
+	transmit_packet(buf, size);
+	return 0;
+}
+
 // Dispatches to the correct kernel function, passing the arguments.
 int32_t
 syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, uint32_t a5)
@@ -506,12 +524,8 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 	// Call the function corresponding to the 'syscallno' parameter.
 	// Return any appropriate return value.
 	// LAB 3: Your code here.
-
-	// panic("syscall not implemented");
-
 	int32_t ret = 0;
 
-	// TODO: Remove debugging printings
 	switch (syscallno) {
 	case SYS_cputs:
 		//cprintf("DEBUG-SYSCALL: Calling sys_cputs!\n");
@@ -575,6 +589,10 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 	case SYS_time_msec:
 		//cprintf("DEBUG-SYSCALL: Calling sys_time_msec!\n");
 		ret = (int32_t) sys_time_msec();
+		break;
+	case SYS_transmit_packet:
+		//cprintf("DEBUG-SYSCALL: Calling sys_transmit_packet!\n");
+		ret = (int32_t) sys_transmit_packet((void *) a1, (size_t) a2);
 		break;
 	default:
 		return -E_INVAL;
