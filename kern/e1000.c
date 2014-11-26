@@ -10,7 +10,7 @@ char *buffers[NUM_TX_DESC];
 struct tx_desc *tx_ring;
 
 /* Auxiliary Funcions */
-static int e1000_page_alloc(void *va, int perm);
+static int e1000_page_alloc(char **va_store, int perm);
 static physaddr_t va2pa(void *va);
 
 /* Testing Functions */
@@ -23,24 +23,22 @@ static void test_transmission();
 void
 init_transmission(void)
 {
-	// TODO: Throw the MMIOLIM logic to e1000_page_alloc
 	cprintf("E1000 initializing transmission\n");
 
-	/* Data structures setups */
+	/* Data structures setup */
 	// Allocate memory for descriptor ring
-	char *va = (char *) MMIOLIM;
+	char *va;
 	int r;
-	if((r = e1000_page_alloc(va, PTE_P | PTE_W)) < 0)
+	if((r = e1000_page_alloc(&va, PTE_P | PTE_W)) < 0)
 		panic("e1000_page_alloc: %e", r);
 
-	// Make descriptor ring point to that va
+	// Make descriptor ring point to the beginning of this new page
 	tx_ring = (struct tx_desc *) va;
 
-	// Allocate memory for the buffers (16)
+	// Allocate memory for the buffers
 	int i;
 	for (i = 0; i < NUM_TX_DESC; i++) {
-		va += PGSIZE;
-		if((r = e1000_page_alloc(va, PTE_P | PTE_W)) < 0)
+		if((r = e1000_page_alloc(&va, PTE_P | PTE_W)) < 0)
 			panic("e1000_page_alloc: %e", r);
 		buffers[i] = va;
 	}
@@ -110,7 +108,7 @@ transmit_packet(void *buf, size_t size)
 	}
 
 	// Set tx_desc registers
-	// Set CMD.EOP, meaning this is the end of packet (Really needed?)
+	// Set CMD.EOP, meaning this is the end of packet (TODO: Really needed?)
 	tx_ring[tail].cmd |= E1000_TXD_CMD_EOP;
 	// Set STAT.DD to 0, meaning this tx_desc is not done, and needs to be sent
 	tx_ring[tail].status &= ~E1000_TXD_STAT_DD;
@@ -120,7 +118,7 @@ transmit_packet(void *buf, size_t size)
 	memmove(buffers[tail], buf, size);
 
 	// Update tx descriptor
-	tx_ring[tail].addr = (uint64_t) va2pa(buffers[tail]);
+	tx_ring[tail].addr = (uint64_t) va2pa(buffers[tail]); //TODO: Redundant! Put this in the initialization
 	tx_ring[tail].length = (uint16_t) size;
 
 	/* Debugging */
@@ -165,18 +163,22 @@ attach_e1000(struct pci_func *pcif)
 /* --- Auxiliary Functions --- */
 /* --------------------------- */
 
-// Custom page allocator for the E1000
+// Custom page allocator for the E1000. If succeeds and va_store is not null,
+// stores the virtual address of this new allocated page in it.
 // Returns:
 //   0 on success
-//   -E_INVAL if va is in user space
 //   -E_NO_MEM if there is no more page to allocate a page or page table for mapping
 static int
-e1000_page_alloc(void *va, int perm)
+e1000_page_alloc(char **va_store, int perm)
 {
-	// Check if va is the kernel address space, so it is copied
-	// to every environment
-	if ((uint32_t) va < UTOP)
-		return -E_INVAL;
+	// Hold the virtual address of the next free page in virtual address space
+	static char *nextfree;
+
+	// Initial address should be in the beggining of a free area, above UTOP
+	// The chosen address for that was MMIOLIM, there could be a better one
+	if (!nextfree) {
+		nextfree = (char *) MMIOLIM;
+	}
 
 	// Tries to allocate a physical page
 	struct PageInfo *pp = page_alloc(ALLOC_ZERO);
@@ -184,12 +186,19 @@ e1000_page_alloc(void *va, int perm)
 	        return -E_NO_MEM;
 	}
 
-	// Tries to map the physical page at va of kern_pgdir
-	int r = page_insert(kern_pgdir, pp, va, perm);
-	if (r < 0) {
+	// Tries to map the physical page at nextfree on kern_pgdir
+	int r;
+	if ((r = page_insert(kern_pgdir, pp, nextfree, perm)) < 0) {
 	        page_free(pp);
 	        return -E_NO_MEM;
 	}
+
+	// Store the va of the page
+	if(va_store)
+		*va_store = nextfree;
+
+	// Increment to next free page, and returns success
+	nextfree += PGSIZE;
 	return 0;
 }
 
