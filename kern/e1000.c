@@ -6,8 +6,10 @@
 #include <kern/pmap.h>
 
 volatile uint32_t *e1000; // Pointer to the start of E1000's MMIO region
-char *buffers[NUM_TX_DESC];
 struct tx_desc *tx_ring;
+char *tx_buffers[NUM_TX_DESC];
+struct rx_desc *rx_ring;
+char *rx_buffers[NUM_RX_DESC];
 
 /* Auxiliary Funcions */
 static int e1000_page_alloc(char **va_store, int perm);
@@ -15,8 +17,10 @@ static physaddr_t va2pa(void *va);
 
 /* Testing Functions */
 static void check_mmio(int check);
-static void check_mappings(int check);
-static void show_mappings(int check);
+static void check_tx_mappings(int check);
+static void show_tx_mappings(int check);
+static void check_rx_mappings(int check);
+static void show_rx_mappings(int check);
 static void test_transmission();
 
 // Initializes transmision
@@ -31,8 +35,6 @@ init_transmission(void)
 	int r;
 	if((r = e1000_page_alloc(&va, PTE_P | PTE_W)) < 0)
 		panic("e1000_page_alloc: %e", r);
-
-	// Make descriptor ring point to the beginning of this new page
 	tx_ring = (struct tx_desc *) va;
 
 	// Allocate memory for the buffers
@@ -40,12 +42,12 @@ init_transmission(void)
 	for (i = 0; i < NUM_TX_DESC; i++) {
 		if((r = e1000_page_alloc(&va, PTE_P | PTE_W)) < 0)
 			panic("e1000_page_alloc: %e", r);
-		buffers[i] = va;
+		tx_buffers[i] = va;
 	}
 
 	// Test mappings
-	check_mappings(1);
-	show_mappings(1);
+	check_tx_mappings(1);
+	show_tx_mappings(1);
 
 	// Initial settings of the tx_descriptors
 	for (i = 0; i < NUM_TX_DESC; i++) {
@@ -114,11 +116,11 @@ transmit_packet(void *buf, size_t size)
 	tx_ring[tail].status &= ~E1000_TXD_STAT_DD;
 
 	// Put packet data in buffer
-	memset(buffers[tail], 0, PGSIZE);
-	memmove(buffers[tail], buf, size);
+	memset(tx_buffers[tail], 0, PGSIZE);
+	memmove(tx_buffers[tail], buf, size);
 
 	// Update tx descriptor
-	tx_ring[tail].addr = (uint64_t) va2pa(buffers[tail]); //TODO: Redundant! Put this in the initialization
+	tx_ring[tail].addr = (uint64_t) va2pa(tx_buffers[tail]); //TODO: Redundant! Put this in the initialization
 	tx_ring[tail].length = (uint16_t) size;
 
 	/* Debugging */
@@ -132,6 +134,92 @@ transmit_packet(void *buf, size_t size)
 	E1000_REG(E1000_TDT) = tail;
 }
 
+// Initializes receive
+void
+init_receive(void)
+{
+	cprintf("E1000 initializing receive\n");
+
+	/* Data structures setup */
+	// Allocate memory for descriptor ring
+	char *va;
+	int r;
+	if((r = e1000_page_alloc(&va, PTE_P | PTE_W)) < 0)
+		panic("e1000_page_alloc: %e", r);
+	rx_ring = (struct rx_desc *) va;
+
+	// Allocate memory for the buffers
+	int i;
+	for (i = 0; i < NUM_RX_DESC; i++) {
+		if((r = e1000_page_alloc(&va, PTE_P | PTE_W)) < 0)
+			panic("e1000_page_alloc: %e", r);
+		rx_buffers[i] = va;
+	}
+
+	// Test mappings
+	check_rx_mappings(1);
+	show_rx_mappings(1);
+
+	// Initial settings of the rx_descriptors
+	/* TODO */
+
+	/* Registers setup */
+
+	// RAL0 and RAH0 (stores the 48-bit mac address, for filtering packets)
+	// E1000_RAL0 with the low 32 bits
+	E1000_REG(E1000_RAL0) = MAC_ADDR_LOW_32;
+	// E1000_RAH0 with high 16 bits, in bits 0-15. 16-31 are zeroes.
+	E1000_REG(E1000_RAH0) = MAC_ADDR_HIGH_16;
+	// Set E1000_RAH0 Address Valid bit
+	E1000_REG(E1000_RAH0) |= E1000_RAH0_AV;
+
+	// MTA 128 registers (Multicast Table Array)
+	// Set everything to zero, as the initial values are X
+	uint32_t mta_addr = E1000_MTA;
+	for (i = 0; i < 128; i++) {
+		E1000_REG(mta_addr) = 0;
+		mta_addr += 4;
+	}
+
+	// IMS (each bit enables an interrupt)
+	// Set to zero as initial value of it's bits are X
+	E1000_REG(E1000_IMS) = 0;
+
+	// RDTR (threshold things, not used)
+	/* Do nothing */
+
+	// RDBAL and RDBAH (Receive Descriptor Ring address)
+	// Always store physical address, not the virtual address!
+	// Don't use RDBAH as we are using 32 bit addresses
+	E1000_REG(E1000_RDBAL) = va2pa(rx_ring);
+
+	// RDLEN (Receive Descriptor Ring length in bytes)
+	// This size must be multiple of 128 bytes
+	E1000_REG(E1000_RDLEN) = NUM_RX_DESC * sizeof(struct rx_desc);
+
+	// RDH and RDT (rx_ring head and tail indexes)
+	/* TODO: How should I initialize this!? */
+	E1000_REG(E1000_RDH) = 0;
+	E1000_REG(E1000_RDT) = 127;
+
+	// RCTL (Receive Control Register) (Initial values are all 0)
+	// RCTL.EN = 1b
+	E1000_REG(E1000_RCTL) |= E1000_RCTL_EN;
+	// RCTL.LPE = 0b
+	/* 0b */
+	// RCTL.LBM = 00b
+	/* 00b */
+	// RCTL.RDMTS = ?
+	/* ...? */
+	// RCTL.MO = ?
+	/* ...? */
+	// RCTL.BAM = 1b
+	E1000_REG(E1000_RCTL) |= E1000_RCTL_BAM;
+	// RCTL.BSIZE = 00b (Buffer size provided by software. 00b->2048 bytes(max))
+	/* 00b */
+	// RCTL.SECRC = 1b (Strips the CRC from packet)
+	E1000_REG(E1000_RCTL) |= E1000_RCTL_SECRC;
+}
 
 // Initialize the E1000, which is a PCI device
 // Returns 0 on success (always)
@@ -150,8 +238,9 @@ attach_e1000(struct pci_func *pcif)
 
 	check_mmio(1);
 
-	// Initialize transmission
+	// Initializations
 	init_transmission();
+	init_receive();
 
 	/* Debugging */
 	//test_transmission();
@@ -227,7 +316,7 @@ check_mmio(int check)
 }
 
 static void
-check_mappings(int check)
+check_tx_mappings(int check)
 {
 	if (!check) return;
 
@@ -244,14 +333,14 @@ check_mappings(int check)
 	// zeroes, by comparing it to the tx_ring page
 	int i;
 	for (i = 0; i < NUM_TX_DESC; i++) {
-		assert(memcmp(tx_ring, buffers[i], PGSIZE) == 0);
+		assert(memcmp(tx_ring, tx_buffers[i], PGSIZE) == 0);
 	}
 
 	cprintf("E1000 TX mappings are ok\n");
 }
 
 static void
-show_mappings(int check)
+show_tx_mappings(int check)
 {
 	if (!check) return;
 
@@ -260,8 +349,47 @@ show_mappings(int check)
 	cprintf("\ttx_ring       \tva=%p, \tpa=%p\n", tx_ring, va2pa(tx_ring));
 	int i;
 	for (i = 0; i < NUM_TX_DESC; i++) {
-		cprintf("\tbuffers[%d] \tva=%p, \tpa=%p\n",
-			i, buffers[i], va2pa(buffers[i]));
+		cprintf("\ttx_buffers[%d] \tva=%p, \tpa=%p\n",
+			i, tx_buffers[i], va2pa(tx_buffers[i]));
+	}
+}
+
+static void
+check_rx_mappings(int check)
+{
+	if (!check) return;
+
+	// Check that the rx_ring page is present, writable and filled with zeroes
+	char *va = (char *) rx_ring;
+	*va = 'a';
+	assert(*(va)      ==  'a');
+	assert(*(va+10)   == '\0');
+	assert(*(va+100)  == '\0');
+	assert(*(va+1000) == '\0');
+	*va = 0;
+
+	// Check that buffers pages are all present, writable and filled with
+	// zeroes, by comparing it to the rx_ring page
+	int i;
+	for (i = 0; i < NUM_RX_DESC; i++) {
+		assert(memcmp(rx_ring, rx_buffers[i], PGSIZE) == 0);
+	}
+
+	cprintf("E1000 RX mappings are ok\n");
+}
+
+static void
+show_rx_mappings(int check)
+{
+	if (!check) return;
+
+	// Print all the RX mappings
+	cprintf("E1000 RX mappings:\n");
+	cprintf("\trx_ring       \tva=%p, \tpa=%p\n", rx_ring, va2pa(rx_ring));
+	int i;
+	for (i = 0; i < NUM_RX_DESC; i++) {
+		cprintf("\trx_buffers[%d] \tva=%p, \tpa=%p\n",
+			i, rx_buffers[i], va2pa(rx_buffers[i]));
 	}
 }
 
