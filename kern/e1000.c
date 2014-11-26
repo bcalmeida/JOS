@@ -123,8 +123,9 @@ transmit_packet(void *buf, size_t size)
 	tx_ring[tail].addr = (uint64_t) va2pa(buffers[tail]);
 	tx_ring[tail].length = (uint16_t) size;
 
-	// Debugging
-	//cprintf("Transmitting packet from buf=%p, with size=%d\n", buf, size);
+	/* Debugging */
+	//cprintf("transmit_packet: Transmitting packet from "
+	//        "buf=%p, with size=%d\n", buf, size);
 	//cprintf("tx_ring[tail].addr = %p\n", tx_ring[tail].addr);
 	//cprintf("tx_ring[tail].length = %d\n", tx_ring[tail].length);
 
@@ -151,8 +152,12 @@ attach_e1000(struct pci_func *pcif)
 
 	check_mmio(1);
 
+	// Initialize transmission
 	init_transmission();
-	test_transmission();
+
+	/* Debugging */
+	//test_transmission();
+
 	return 0;
 }
 
@@ -254,6 +259,7 @@ show_mappings(int check)
 static void
 test_transmission(void)
 {
+	cprintf("Testing transmission...\n");
 	uint32_t data[50];
 	int i;
 
