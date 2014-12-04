@@ -517,6 +517,18 @@ sys_transmit_packet(void *buf, size_t size) {
 	return 0;
 }
 
+static int
+sys_receive_packet(void *buf, size_t *size_store) {
+	// Check pointers provided by user
+	if (!buf || ((uint32_t) buf) > UTOP)
+		return -E_INVAL;
+	if (!size_store || ((uint32_t) size_store) > UTOP)
+		return -E_INVAL;
+
+	receive_packet(buf, size_store);
+	return 0;
+}
+
 // Dispatches to the correct kernel function, passing the arguments.
 int32_t
 syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, uint32_t a5)
@@ -593,6 +605,10 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 	case SYS_transmit_packet:
 		//cprintf("DEBUG-SYSCALL: Calling sys_transmit_packet!\n");
 		ret = (int32_t) sys_transmit_packet((void *) a1, (size_t) a2);
+		break;
+	case SYS_receive_packet:
+		//cprintf("DEBUG-SYSCALL: Calling sys_receive_packet!\n");
+		ret = (int32_t) sys_receive_packet((void *) a1, (size_t *) a2);
 		break;
 	default:
 		return -E_INVAL;

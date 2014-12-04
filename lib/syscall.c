@@ -129,3 +129,10 @@ sys_transmit_packet(void *buf, size_t size)
 	return syscall(SYS_transmit_packet, 1,
 		(uint32_t) buf, (uint32_t) size, 0, 0, 0);
 }
+
+int
+sys_receive_packet(void *buf, size_t *size_store)
+{
+	return syscall(SYS_receive_packet, 1,
+		(uint32_t) buf, (uint32_t) size_store, 0, 0, 0);
+}
