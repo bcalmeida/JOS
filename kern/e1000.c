@@ -22,6 +22,7 @@ static void show_tx_mappings(int check);
 static void check_rx_mappings(int check);
 static void show_rx_mappings(int check);
 static void test_transmission();
+static void test_receive();
 
 // Initializes transmision
 void
@@ -161,7 +162,24 @@ init_receive(void)
 	show_rx_mappings(1);
 
 	// Initial settings of the rx_descriptors
-	/* TODO */
+	for (i = 0; i < NUM_RX_DESC; i++) {
+		// DD will be set automatically. It starts with 0 for all hardware
+		// owned descriptors
+		/* Already zero */
+
+		// EOP will be set automatically. It starts with 0 for all hw owned
+		// descriptors
+		/* Already zero */
+
+		// Buffer address
+		rx_ring[i].addr = (uint64_t) va2pa(rx_buffers[i]);
+	}
+
+	// The last descriptor starts pointed by the tail
+	// The rx descriptor pointed by the tail is always software owned and
+	// holds no packet (DD=1, EOP=1)
+	rx_ring[NUM_RX_DESC-1].status |= E1000_RXD_STAT_DD;
+	rx_ring[NUM_RX_DESC-1].status |= E1000_RXD_STAT_EOP;
 
 	/* Registers setup */
 
@@ -198,9 +216,8 @@ init_receive(void)
 	E1000_REG(E1000_RDLEN) = NUM_RX_DESC * sizeof(struct rx_desc);
 
 	// RDH and RDT (rx_ring head and tail indexes)
-	/* TODO: How should I initialize this!? */
 	E1000_REG(E1000_RDH) = 0;
-	E1000_REG(E1000_RDT) = 127;
+	E1000_REG(E1000_RDT) = NUM_RX_DESC - 1;
 
 	// RCTL (Receive Control Register) (Initial values are all 0)
 	// RCTL.EN = 1b
@@ -219,6 +236,45 @@ init_receive(void)
 	/* 00b */
 	// RCTL.SECRC = 1b (Strips the CRC from packet)
 	E1000_REG(E1000_RCTL) |= E1000_RCTL_SECRC;
+}
+
+// Receive packet function. If there is no packet to be received, does nothing.
+// The invariants are:
+//   Descriptors owned by software: DD and EOP is set
+//   Descriptors owned by hardware: DD and EOP are not set
+//   The desc. pointed by the tail is SW-owned, but holds no packet.
+void
+receive_packet(void *buf, size_t *size_store)
+{
+	// Initial checkings
+	if (!buf || !size_store)
+		panic("Null pointer passed");
+
+	uint32_t tail = E1000_REG(E1000_RDT);
+	uint32_t next = (tail+1)%NUM_RX_DESC;
+
+	// Analyzes if the next is sw owned(DD = 1) or hw owned (DD = 0)
+	if (rx_ring[next].status & E1000_RXD_STAT_DD) {
+		/* Debugging */
+		// cprintf("receive_packet - copying packet to provided buf\n");
+
+		// The next descriptor is sofware owned, so we can read it's data
+		// Attention: don't use the buffer address from the descriptor,
+		// since it's a physical address
+		memmove(buf, rx_buffers[next], (size_t)rx_ring[next].length);
+		*size_store = (size_t) rx_ring[next].length;
+
+		// Current tail becomes hw-owned (DD=0, EOP=0)
+		rx_ring[tail].status &= ~E1000_RXD_STAT_DD;
+		rx_ring[tail].status &= ~E1000_RXD_STAT_EOP;
+
+		// Now make tail point to next
+		E1000_REG(E1000_RDT) = next;
+	} else {
+		// The next descriptor is hardware owned. There's nothing to receive
+		/* Do nothing */
+		return;
+	}
 }
 
 // Initialize the E1000, which is a PCI device
@@ -244,6 +300,7 @@ attach_e1000(struct pci_func *pcif)
 
 	/* Debugging */
 	//test_transmission();
+	//test_receive();
 
 	return 0;
 }
@@ -407,4 +464,30 @@ test_transmission(void)
 	for (i = 0; i < 18; i++) {
 		transmit_packet(&data, sizeof(data));
 	}
+}
+
+static void
+test_receive(void)
+{
+	cprintf("test_receive - Testing receive...\n");
+	char *buf;
+	size_t length;
+	int r;
+	int i;
+
+	// Allocate buffer to hold received packet
+	cprintf("test_receive - Allocating buffer to hold received packet\n");
+	if ((r = e1000_page_alloc(&buf, PTE_P | PTE_W)) < 0)
+		panic("e1000_page_alloc: %e", r);
+	cprintf("test_receive - buffer: va = %p, pa = %p\n", buf, va2pa(buf));
+
+	// Try to receive a packet
+	cprintf("test_receive - calling receive_packet\n");
+	receive_packet(buf, &length);
+
+	// Print the result
+	cprintf("test_receive - data on buf after receiving (first 1000 bytes):\n");
+	for (i = 0; i < 1000; i++)
+		cprintf("%d ", *(buf + i));
+	cprintf("\n");
 }

@@ -74,11 +74,13 @@
 #define E1000_RCTL_SECRC          0x04000000    /* Strip Ethernet CRC */
 
 // Receive Descriptor bit definitions
-/* TODO */
+#define E1000_RXD_STAT_DD       0x01    /* Descriptor Done */
+#define E1000_RXD_STAT_EOP      0x02    /* End of Packet */
 
 /* Functions headers */
 int attach_e1000(struct pci_func *pcif);
 void transmit_packet(void *buf, size_t size);
+void receive_packet(void *buf, size_t* size_store);
 
 /* Structures */
 
