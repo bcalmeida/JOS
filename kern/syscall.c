@@ -529,6 +529,19 @@ sys_receive_packet(void *buf, size_t *size_store) {
 	return 0;
 }
 
+// Stores the 6 bytes of the mac address in buf, from the lowest
+// order byte, to the highest order
+// Returns 0 on success, < 0 if pointer provided is invalid
+static int
+sys_get_mac_address(void *buf) {
+	// Check pointers provided by user
+	if (!buf || ((uint32_t) buf) > UTOP)
+		return -E_INVAL;
+
+	get_mac_address(buf);
+	return 0;
+}
+
 // Dispatches to the correct kernel function, passing the arguments.
 int32_t
 syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, uint32_t a5)
@@ -609,6 +622,10 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 	case SYS_receive_packet:
 		//cprintf("DEBUG-SYSCALL: Calling sys_receive_packet!\n");
 		ret = (int32_t) sys_receive_packet((void *) a1, (size_t *) a2);
+		break;
+	case SYS_get_mac_address:
+		//cprintf("DEBUG-SYSCALL: Calling sys_get_mac_address!\n");
+		ret = (int32_t) sys_get_mac_address((void *) a1);
 		break;
 	default:
 		return -E_INVAL;

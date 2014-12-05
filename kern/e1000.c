@@ -6,6 +6,7 @@
 #include <kern/pmap.h>
 
 volatile uint32_t *e1000; // Pointer to the start of E1000's MMIO region
+uint8_t mac_address[6]; // Mac address, 6 bytes
 struct tx_desc *tx_ring;
 char *tx_buffers[NUM_TX_DESC];
 struct rx_desc *rx_ring;
@@ -185,11 +186,18 @@ init_receive(void)
 
 	// RAL0 and RAH0 (stores the 48-bit mac address, for filtering packets)
 	// E1000_RAL0 with the low 32 bits
-	E1000_REG(E1000_RAL0) = MAC_ADDR_LOW_32;
 	// E1000_RAH0 with high 16 bits, in bits 0-15. 16-31 are zeroes.
-	E1000_REG(E1000_RAH0) = MAC_ADDR_HIGH_16;
-	// Set E1000_RAH0 Address Valid bit
-	E1000_REG(E1000_RAH0) |= E1000_RAH0_AV;
+	uint32_t mac_addr_low_32 =
+		(((uint32_t) mac_address[0]) <<  0) +
+		(((uint32_t) mac_address[1]) <<  8) +
+		(((uint32_t) mac_address[2]) << 16) +
+		(((uint32_t) mac_address[3]) << 24);
+	uint32_t mac_addr_high_16 =
+		(((uint32_t) mac_address[4]) << 0) +
+		(((uint32_t) mac_address[5]) << 8);
+	E1000_REG(E1000_RAL0) = mac_addr_low_32;
+	E1000_REG(E1000_RAH0) = mac_addr_high_16;
+	E1000_REG(E1000_RAH0) |= E1000_RAH0_AV; // Set E1000_RAH0 Address Valid bit
 
 	// MTA 128 registers (Multicast Table Array)
 	// Set everything to zero, as the initial values are X
@@ -277,6 +285,55 @@ receive_packet(void *buf, size_t *size_store)
 	}
 }
 
+uint16_t
+read_eeprom(uint32_t addr)
+{
+	// Order controller to read a byte of mac address
+	// EERD.ADDR = address in eeprom space and set EERD.START
+	E1000_REG(E1000_EERD) = addr << 8;
+	E1000_REG(E1000_EERD) |= E1000_EERD_START;
+
+	// Wait until the reading is done, and then get the data
+	while ((E1000_REG(E1000_EERD) & E1000_EERD_DONE) == 0) {
+		/* Wait while it's not done */
+	}
+
+	// Return the data in EERD.DATA
+	return (E1000_REG(E1000_EERD) >> 16);
+}
+
+void
+read_mac_address(void)
+{
+	uint16_t mac_address_2_1 = read_eeprom(E1000_EEPROM_ETHERNET_ADDR_2_1);
+	uint16_t mac_address_4_3 = read_eeprom(E1000_EEPROM_ETHERNET_ADDR_4_3);
+	uint16_t mac_address_6_5 = read_eeprom(E1000_EEPROM_ETHERNET_ADDR_6_5);
+
+	mac_address[0] = (uint8_t) mac_address_2_1;
+	mac_address[1] = (uint8_t) (mac_address_2_1 >> 8);
+	mac_address[2] = (uint8_t) mac_address_4_3;
+	mac_address[3] = (uint8_t) (mac_address_4_3 >> 8);
+	mac_address[4] = (uint8_t) mac_address_6_5;
+	mac_address[5] = (uint8_t) (mac_address_6_5 >> 8);
+
+	cprintf("MAC address read: %x %x %x %x %x %x\n",
+		mac_address[5], mac_address[4], mac_address[3],
+		mac_address[2], mac_address[1], mac_address[0]);
+}
+
+void
+get_mac_address(void *buf)
+{
+	if (!buf)
+		panic("get_mac_address: null pointer");
+
+	uint8_t *mac_addr_copy = (uint8_t *) buf;
+	int i;
+	for (i = 0; i < 6; i++) {
+		*(mac_addr_copy + i) = mac_address[i];
+	}
+}
+
 // Initialize the E1000, which is a PCI device
 // Returns 0 on success (always)
 int
@@ -293,6 +350,9 @@ attach_e1000(struct pci_func *pcif)
 	e1000 = mmio_map_region(pa, size);
 
 	check_mmio(1);
+
+	// Read mac address - Challenge
+	read_mac_address();
 
 	// Initializations
 	init_transmission();

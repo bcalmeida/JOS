@@ -22,6 +22,15 @@
 // Register used to test MMIO
 #define E1000_STATUS   0x00008  /* Device Status - RO */
 
+/* -- EEPROM Registers -- */
+#define E1000_EERD     0x00014  /* EEPROM Read - RW */
+#define E1000_EERD_START         0x00000001
+#define E1000_EERD_DONE          0x00000010
+
+#define E1000_EEPROM_ETHERNET_ADDR_2_1 0x00
+#define E1000_EEPROM_ETHERNET_ADDR_4_3 0x01
+#define E1000_EEPROM_ETHERNET_ADDR_6_5 0x02
+
 /* -- Registers used in TX -- */
 // Other tx registers
 #define E1000_TIPG     0x00410  /* TX Inter-packet gap -RW */
@@ -81,6 +90,7 @@
 int attach_e1000(struct pci_func *pcif);
 void transmit_packet(void *buf, size_t size);
 void receive_packet(void *buf, size_t* size_store);
+void get_mac_address(void *buf);
 
 /* Structures */
 

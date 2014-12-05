@@ -62,6 +62,7 @@ int	sys_ipc_recv(void *rcv_pg);
 unsigned int sys_time_msec(void);
 int     sys_transmit_packet(void *buf, size_t size);
 int     sys_receive_packet(void *buf, size_t *size_store);
+int     sys_get_mac_address(void *buf);
 
 // This must be inlined.  Exercise for reader: why?
 static __inline envid_t __attribute__((always_inline))
