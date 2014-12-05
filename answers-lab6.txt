@@ -1,0 +1,31 @@
+ANSWERS-LAB6
+
+1. How did you structure your transmit implementation? In particular, what do you do if the transmit ring is full?
+Answer:	During driver initialization we reserve a page for the TX_RING and a page for each buffer, in which we have a buffer for each TX_DESCRIPTOR. With this we have don't have to worry about the size of packet being bigger than the buffer, since the maximum packet size is 1518 bytes. To do the pages allocation, the function e1000_page_alloc() was created, and also some tests for it were created. The transmit_packet function was implemented so that if the transmit ring is full, the packet is dropped. This is simpler to implement and works because the TCP handles this situation.
+
+
+2. How did you structure your receive implementation? In particular, what do you do if the receive queue is empty and a user environment requests the next incoming packet?
+Answer:	During driver initialization we reserve a page for the RX_RING and a page for each buffer, in which we have a buffer for each RX_DESCRIPTOR. With this we have don't have to worry about the size of packet being bigger than the buffer and we don't need to support "long packets", since the maximum packet size is 1518 bytes. To do the pages allocation, we use the function e1000_page_alloc() that was also used in the transmit initialization . The receive_packet function was implemented so that when the RX_RING is empty, it simply does nothing, by not changing the data structures provided, so the user environment knows it should try again.
+
+
+3. What does the web page served by JOS's web server say?
+Answer: This file came from JOS. Cheesy web page!
+
+
+4. How long approximately did it take you to do this lab?
+Answer: 45 to 50 hours
+
+
+CHALLENGE - MAC address from EEPROM
+
+"Challenge! Read about the EEPROM in the developer's manual and write the code to load the E1000's MAC address out of the EEPROM. Currently, QEMU's default MAC address is hard-coded into both your receive initialization and lwIP. Fix your initialization to use the MAC address you read from the EEPROM, add a system call to pass the MAC address to lwIP, and modify lwIP to the MAC address read from the card. Test your change by configuring QEMU to use a different MAC address."
+
+To implement this challenge, a function to read a address from the EEPROM, according to the Intel Manual, was created, read_eeprom(). With that, we read the 3 addresses that store the MAC address, and store it in a global variable uint_8 mac_address[6], containing all the 6 bytes. We do this before initializing the transmission or the receive. 
+With that, we can now use the value in this variable instead of the hardcoded value when initializing the receive registers RAL0 and RAH0. 
+
+To make it possible for lwip to get the mac address, a system call sys_get_mac_address was created, in which it receives a buffer, and stores in it the 6 bytes of the mac address. With that, in lwip, we can simply call "sys_get_mac_address(netif->hwaddr);" instead of having all those lines with the hardcoded MAC address.
+
+To further test that it was correct, I changed the QEMU mac address, for example to 10:22:33:44:55:66, with the following line in GNUmakefile:
+	QEMUOPTS += -net user -net nic,macaddr=10:22:33:44:55:66,model=e1000 -redir tcp:$(PORT7)::7 \
+
+With that, it is still possible to access the page server by JOS on the browser, which means the solution to this challenge works for any mac address, as expected.
